@@ -34,6 +34,36 @@
       "sources": ["Khajiit caravans", "Thieves Guild"],
       "rarity": "Common",
       "price": 2500
+    },
+    // Cosplay Pack Gala has no outfit records (412 mix-and-match pieces in colour variants),
+    // so its sets are listed piece by piece.
+    {
+      "name": "Thorn Princess",
+      "pieces": [
+        "[Caenarvon] Cosplay Pack Gala.esp|0xA1A",   // gown
+        "[Caenarvon] Cosplay Pack Gala.esp|0xC52",   // crown
+        "[Caenarvon] Cosplay Pack Gala.esp|0xC1E",   // gloves
+        "[Caenarvon] Cosplay Pack Gala.esp|0xC1D",   // boots
+        "[Caenarvon] Cosplay Pack Gala.esp|0xC53",   // earring
+        "[Caenarvon] Cosplay Pack Gala.esp|0xC21",   // straps
+        "[Caenarvon] Cosplay Pack Gala.esp|0xC1F"    // panties
+      ],
+      "sources": ["Radiant Raiment"],
+      "rarity": "Rare",
+      "price": 2000
+    },
+    {
+      "name": "Patricia Velvet Gown",
+      "pieces": [
+        "[Caenarvon] Cosplay Pack Gala.esp|0xC2B",   // gown
+        "[Caenarvon] Cosplay Pack Gala.esp|0xC2D",   // overlay
+        "[Caenarvon] Cosplay Pack Gala.esp|0xCCC",   // ribbon high heels
+        "[Caenarvon] Cosplay Pack Gala.esp|0xBA7",   // earrings 'Rio de Plata'
+        "[Caenarvon] Cosplay Pack Gala.esp|0xE92"    // bracelet 'Clearwater'
+      ],
+      "sources": ["Radiant Raiment"],
+      "rarity": "Common",
+      "price": 1200
     }
   ]
 }
