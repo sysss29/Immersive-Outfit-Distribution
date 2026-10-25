@@ -13,6 +13,7 @@ namespace IOD
 	public:
 		static Stocker* GetSingleton();
 		static void     Install();
+		static void     MakeTradeable();  // after the catalog is loaded
 		static void     OnGameLoaded();  // after a save is loaded or a new game starts
 
 		RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent* a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>*) override;

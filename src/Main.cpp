@@ -28,6 +28,7 @@ namespace
 		if (a_message->type == SKSE::MessagingInterface::kDataLoaded) {
 			IOD::ResolveVendorFactions();
 			IOD::Catalog::GetSingleton().Load();
+			IOD::Stocker::MakeTradeable();
 			IOD::Stocker::Install();
 		} else if (a_message->type == SKSE::MessagingInterface::kPostLoadGame ||
 				   a_message->type == SKSE::MessagingInterface::kNewGame) {
@@ -40,7 +41,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 {
 	SKSE::Init(a_skse);
 	InitLogging();
-	spdlog::info("Immersive Outfit Distribution 0.1.2 on Skyrim {}", REL::Module::get().version().string());
+	spdlog::info("Immersive Outfit Distribution 0.1.3 on Skyrim {}", REL::Module::get().version().string());
 
 	IOD::State::Register();
 	if (!SKSE::GetMessagingInterface()->RegisterListener(OnMessage)) {

@@ -117,6 +117,46 @@ namespace IOD
 		}
 	}
 
+	// A vendor only lists chest items its buy/sell list allows: Radiant Raiment takes items tagged
+	// VendorItemClothing or VendorItemJewelry, so a set tagged VendorItemArmor stays hidden. Each
+	// piece gets a keyword the vendor accepts (a side effect: those vendors also buy it from you).
+	void Stocker::MakeTradeable()
+	{
+		for (const auto& set : Catalog::GetSingleton().Sets()) {
+			for (const auto source : kAllSources) {
+				if (!set.HasSource(source)) {
+					continue;
+				}
+				for (auto* faction : VendorFactions(source)) {
+					auto* list = faction->vendorData.vendorSellBuyList;
+					if (!list) {
+						continue;  // no list: the vendor trades anything
+					}
+					std::vector<RE::BGSKeyword*> keywords;
+					for (auto* form : list->forms) {
+						if (auto* keyword = form ? form->As<RE::BGSKeyword>() : nullptr) {
+							keywords.push_back(keyword);
+						}
+					}
+					const bool excluding = faction->vendorData.vendorValues.notBuySell;
+					for (auto* piece : set.pieces) {
+						auto* form = piece->As<RE::BGSKeywordForm>();
+						if (!form) {
+							continue;
+						}
+						const bool matches = std::ranges::any_of(keywords, [&](auto* k) { return form->HasKeyword(k); });
+						if (excluding && matches) {
+							spdlog::warn("\"{}\": a piece has a keyword {} refuses to trade", set.name, faction->GetName());
+						} else if (!excluding && !matches && !keywords.empty()) {
+							form->AddKeyword(keywords.back());
+							spdlog::info("\"{}\": tagged {:08X} so {} can trade it", set.name, piece->GetFormID(), faction->GetName());
+						}
+					}
+				}
+			}
+		}
+	}
+
 	Stocker* Stocker::GetSingleton()
 	{
 		static Stocker singleton;
