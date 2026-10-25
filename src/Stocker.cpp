@@ -47,9 +47,6 @@ namespace IOD
 
 	void Stocker::Install()
 	{
-		if (auto* events = RE::ScriptEventSourceHolder::GetSingleton()) {
-			events->AddEventSink<RE::TESActivateEvent>(GetSingleton());
-		}
 		if (auto* ui = RE::UI::GetSingleton()) {
 			ui->AddEventSink<RE::MenuOpenCloseEvent>(GetSingleton());
 		}
@@ -63,23 +60,10 @@ namespace IOD
 		return static_cast<std::int32_t>(std::floor(days / 2.0f));
 	}
 
-	RE::BSEventNotifyControl Stocker::ProcessEvent(const RE::TESActivateEvent* a_event, RE::BSTEventSource<RE::TESActivateEvent>*)
-	{
-		if (!a_event || !a_event->actionRef || !a_event->objectActivated) {
-			return RE::BSEventNotifyControl::kContinue;
-		}
-		if (a_event->actionRef.get() != RE::PlayerCharacter::GetSingleton()) {
-			return RE::BSEventNotifyControl::kContinue;
-		}
-		if (auto* actor = a_event->objectActivated->As<RE::Actor>()) {
-			QueueVendor(actor->GetHandle());
-		}
-		return RE::BSEventNotifyControl::kContinue;
-	}
-
 	RE::BSEventNotifyControl Stocker::ProcessEvent(const RE::MenuOpenCloseEvent* a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>*)
 	{
-		// Fallback for trade windows opened without an activation (e.g. by another mod).
+		// Stock when the trade window opens. The game restocks a vendor's chest at exactly this
+		// moment (wiping anything added earlier), so adding before it is pointless.
 		if (a_event && a_event->opening && a_event->menuName == RE::BarterMenu::MENU_NAME) {
 			auto ref = RE::TESObjectREFR::LookupByHandle(RE::BarterMenu::GetTargetRefHandle());
 			if (auto* actor = ref ? ref->As<RE::Actor>() : nullptr) {
@@ -91,24 +75,44 @@ namespace IOD
 
 	void Stocker::QueueVendor(RE::ActorHandle a_actor)
 	{
+		// Next frame: the menu has finished building its list, so the refresh below sees our items.
 		SKSE::GetTaskInterface()->AddTask([a_actor]() {
 			if (auto actor = a_actor.get()) {
-				StockVendor(actor.get());
+				if (StockVendor(actor.get())) {
+					RefreshBarterMenu();
+				}
 			}
 		});
 	}
 
-	void Stocker::StockVendor(RE::Actor* a_actor)
+	// Makes the open trade window rebuild its item list, the way a completed transaction does
+	// (SkyUI's BarterMenu.doTransaction with an amount of 0 changes nothing else).
+	void Stocker::RefreshBarterMenu()
+	{
+		auto* ui = RE::UI::GetSingleton();
+		if (!ui || !ui->IsMenuOpen(RE::BarterMenu::MENU_NAME)) {
+			return;
+		}
+		auto menu = ui->GetMenu<RE::BarterMenu>();
+		if (menu && menu->uiMovie) {
+			RE::GFxValue amount(0.0);
+			if (!menu->uiMovie->Invoke("_root.Menu_mc.doTransaction", nullptr, &amount, 1)) {
+				spdlog::warn("Could not refresh the trade window; reopen it to see new stock");
+			}
+		}
+	}
+
+	bool Stocker::StockVendor(RE::Actor* a_actor)
 	{
 		auto* faction = a_actor ? a_actor->GetVendorFaction() : nullptr;
 		const auto source = SourceForFaction(faction);
 		if (!source) {
-			return;
+			return false;
 		}
 		auto* chest = faction->vendorData.merchantContainer;
 		if (!chest) {
 			spdlog::warn("{}: vendor faction {:08X} has no merchant chest", a_actor->GetDisplayFullName(), faction->GetFormID());
-			return;
+			return false;
 		}
 
 		const auto period = CurrentPeriod();
@@ -161,9 +165,11 @@ namespace IOD
 				const auto message = fmt::format("New arrivals at {}.", SourceName(*source));
 				RE::SendHUDMessage::ShowHUDMessage(message.c_str());
 			}
-		} else if (piecesAdded > 0) {
-			spdlog::info("Period {}: {} restocked {} piece(s) after a chest reset", period, name, piecesAdded);
 		}
+		if (piecesAdded > 0) {
+			spdlog::info("Period {}: {} received {} piece(s)", period, name, piecesAdded);
+		}
+		return piecesAdded > 0;
 	}
 
 	// Decides, once per period, which sets every vendor shows: 0-3 per vendor, weighted by

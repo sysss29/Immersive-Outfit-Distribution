@@ -12,6 +12,9 @@ namespace
 			return;
 		}
 		const auto path = *dir / "ImmersiveOutfitDistribution.log";
+		// Keep the previous session's log (useful after a freeze or crash).
+		std::error_code ec;
+		std::filesystem::rename(path, *dir / "ImmersiveOutfitDistribution.previous.log", ec);
 		auto sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(path.string(), true);
 		auto log = std::make_shared<spdlog::logger>("IOD", std::move(sink));
 		log->set_level(spdlog::level::info);
@@ -34,7 +37,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 {
 	SKSE::Init(a_skse);
 	InitLogging();
-	spdlog::info("Immersive Outfit Distribution 0.1.0 on Skyrim {}", REL::Module::get().version().string());
+	spdlog::info("Immersive Outfit Distribution 0.1.1 on Skyrim {}", REL::Module::get().version().string());
 
 	IOD::State::Register();
 	if (!SKSE::GetMessagingInterface()->RegisterListener(OnMessage)) {
