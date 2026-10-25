@@ -2,14 +2,18 @@
 
 namespace IOD
 {
-	// Adds the current period's sets to a vendor's merchant chest when the player opens their
-	// trade window, then refreshes the window.
+	// Makes each vendor's current sets part of their stock:
+	//  - the pieces are written into the merchant chest's base container, so the game's own
+	//    restock (when a trade window opens after the reset interval) adds them like vanilla items;
+	//  - when you start talking to a vendor, missing pieces are also put into the chest directly,
+	//    for the case where no restock is due.
 	class Stocker :
 		public RE::BSTEventSink<RE::MenuOpenCloseEvent>
 	{
 	public:
 		static Stocker* GetSingleton();
 		static void     Install();
+		static void     OnGameLoaded();  // after a save is loaded or a new game starts
 
 		RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent* a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>*) override;
 
@@ -17,8 +21,8 @@ namespace IOD
 		static std::int32_t CurrentPeriod();
 
 	private:
-		static void QueueVendor(RE::ActorHandle a_actor);
-		static bool StockVendor(RE::Actor* a_actor);  // true if pieces were added
+		static void SyncBaseContainers();
+		static void PrepareVendor(RE::TESFaction* a_faction, std::string_view a_name);
 		static void RefreshBarterMenu();
 		static void EnsureAllocation(std::int32_t a_period);
 	};
