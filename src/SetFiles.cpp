@@ -25,7 +25,9 @@ namespace IOD
 //                  {"type": "health" | "magicka" | "stamina", "value": 200}
 //                  {"type": "skill", "skill": "Restoration", "value": 20}
 //                  {"type": "faction", "faction": "Skyrim.esm|0x29DA9", "rank": 1}
-//                  {"type": "quest", "quest": "Plugin.esp|0x...."}
+//                  {"type": "quest", "quest": "TG09"}        (editor ID or Plugin.esp|0x....)
+//                  {"type": "perk", "perk": "Plugin.esp|0x...."}
+//                  {"type": "blessing", "god": "Mara"}      (shrines: milestone 4)
 //   unique       true (default): leaves rotation once you own every piece
 //   enabled      true (default)
 )";

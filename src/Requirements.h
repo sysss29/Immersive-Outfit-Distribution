@@ -14,6 +14,7 @@ namespace IOD
 			kFaction,    // rank in faction >= value
 			kQuest,      // quest completed
 			kBlessing,   // current blessing (milestone 4; never met before then)
+			kPerk,       // the player has this perk
 			kInvalid,    // couldn't be read (e.g. quest not found): never met, so the set stays hidden
 		};
 

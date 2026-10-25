@@ -12,6 +12,7 @@ Int Property REQ_SKILL = 5 AutoReadOnly
 Int Property REQ_FACTION = 6 AutoReadOnly
 Int Property REQ_QUEST = 7 AutoReadOnly
 Int Property REQ_BLESSING = 8 AutoReadOnly
+Int Property REQ_PERK = 9 AutoReadOnly
 Int Property FACTION_OTHER = 8 AutoReadOnly
 Int Property QUEST_OTHER = 6 AutoReadOnly
 
@@ -36,6 +37,7 @@ Int oReqValue = -1
 Int oReqSkill = -1
 Int oReqFaction = -1
 Int oReqGod = -1
+Int oReqPerk = -1
 Int oReqQuest = -1
 Int oReqRef = -1
 Int oReload = -1
@@ -92,6 +94,7 @@ Function ClearIds()
 	oReqSkill = -1
 	oReqFaction = -1
 	oReqGod = -1
+	oReqPerk = -1
 	oReqQuest = -1
 	oReqRef = -1
 	oReload = -1
@@ -222,6 +225,16 @@ Function ShowEditor()
 			oReqRef = AddInputOption("Editor ID or form", IOD_Native.GetText(s, "reqref"))
 		EndIf
 		AddTextOption(IOD_Native.GetText(s, "reqrefcheck"), "", OPTION_FLAG_DISABLED)
+	ElseIf t == REQ_PERK
+		String[] trees = ListOf("skills")
+		oReqSkill = AddMenuOption("Skill tree", trees[IOD_Native.GetInt(s, "reqskill")])
+		String[] perks = IOD_Native.PerkChoices(s)
+		Int p = IOD_Native.GetInt(s, "reqperk")
+		oReqPerk = AddMenuOption("Perk", perks[p])
+		If p == perks.Length - 1
+			oReqRef = AddInputOption("Editor ID or form", IOD_Native.GetText(s, "reqref"))
+		EndIf
+		AddTextOption(IOD_Native.GetText(s, "reqrefcheck"), "", OPTION_FLAG_DISABLED)
 	ElseIf t == REQ_BLESSING
 		String[] gods = ListOf("gods")
 		oReqGod = AddMenuOption("God", gods[IOD_Native.GetInt(s, "reqgod")])
@@ -266,7 +279,7 @@ EndFunction
 String[] Function ListOf(String asList)
 	String[] out
 	If asList == "reqtype"
-		out = new String[9]
+		out = new String[10]
 		out[0] = "No requirement"
 		out[1] = "Character level"
 		out[2] = "Base Health"
@@ -276,6 +289,7 @@ String[] Function ListOf(String asList)
 		out[6] = "Faction rank"
 		out[7] = "Quest completed"
 		out[8] = "Blessing of a god"
+		out[9] = "Has perk"
 		Return out
 	EndIf
 	out = IOD_Native.Choices(asList)
@@ -405,6 +419,10 @@ Event OnOptionMenuOpen(Int aiOption)
 		SetMenuDialogOptions(ListOf("skills"))
 		SetMenuDialogStartIndex(IOD_Native.GetInt(selected, "reqskill"))
 		SetMenuDialogDefaultIndex(0)
+	ElseIf aiOption == oReqPerk
+		SetMenuDialogOptions(IOD_Native.PerkChoices(selected))
+		SetMenuDialogStartIndex(IOD_Native.GetInt(selected, "reqperk"))
+		SetMenuDialogDefaultIndex(0)
 	ElseIf aiOption == oReqGod
 		SetMenuDialogOptions(ListOf("gods"))
 		SetMenuDialogStartIndex(IOD_Native.GetInt(selected, "reqgod"))
@@ -430,6 +448,8 @@ Event OnOptionMenuAccept(Int aiOption, Int aiIndex)
 		Report(IOD_Native.SetInt(selected, "reqtype", aiIndex))
 	ElseIf aiOption == oReqSkill
 		Report(IOD_Native.SetInt(selected, "reqskill", aiIndex))
+	ElseIf aiOption == oReqPerk
+		Report(IOD_Native.SetInt(selected, "reqperk", aiIndex))
 	ElseIf aiOption == oReqGod
 		Report(IOD_Native.SetInt(selected, "reqgod", aiIndex))
 	ElseIf aiOption == oReqQuest

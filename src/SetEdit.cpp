@@ -36,6 +36,49 @@ namespace IOD::Edit
 		return name && *name ? fmt::format("{}: {}", known.label, name) : fmt::format("{} ({})", known.label, known.ref);
 	}
 
+	std::vector<RE::BGSPerk*> PerksOfTree(int a_skill)
+	{
+		std::vector<RE::BGSPerk*> perks;
+		const auto av = static_cast<RE::ActorValue>(static_cast<int>(RE::ActorValue::kOneHanded) + std::clamp(a_skill, 0, 17));
+		auto*      info = RE::ActorValueList::GetActorValueInfo(av);
+		if (!info || !info->perkTree) {
+			return perks;
+		}
+		std::vector<RE::BGSSkillPerkTreeNode*>        queue{ info->perkTree };
+		std::unordered_set<RE::BGSSkillPerkTreeNode*> seen;
+		for (std::size_t i = 0; i < queue.size(); ++i) {
+			auto* node = queue[i];
+			if (!node || !seen.insert(node).second) {
+				continue;
+			}
+			for (auto* perk = node->perk; perk && std::ranges::find(perks, perk) == perks.end(); perk = perk->nextPerk) {
+				perks.push_back(perk);
+			}
+			for (auto* child : node->children) {
+				queue.push_back(child);
+			}
+		}
+		return perks;
+	}
+
+	std::string PerkLabel(const RE::BGSPerk* a_perk)
+	{
+		const char* name = a_perk ? a_perk->GetName() : nullptr;
+		return name && *name ? std::string(name) : FormString(a_perk);
+	}
+
+	RE::BGSPerk* DraftPerk(const Draft& a_draft)
+	{
+		if (a_draft.reqPerk >= 0) {
+			const auto perks = PerksOfTree(a_draft.reqSkill);
+			if (static_cast<std::size_t>(a_draft.reqPerk) < perks.size()) {
+				return perks[static_cast<std::size_t>(a_draft.reqPerk)];
+			}
+		}
+		auto* form = LookupFormString(a_draft.reqRef);
+		return form ? form->As<RE::BGSPerk>() : nullptr;
+	}
+
 	int MaxFactionRank(const Draft& a_draft)
 	{
 		const char* ref = a_draft.reqFaction == kFactionOther ? a_draft.reqRef : kFactions[static_cast<std::size_t>(a_draft.reqFaction)].ref;
@@ -261,6 +304,19 @@ namespace IOD::Edit
 					}
 				}
 				CopyTo(a_draft.reqRef, ref);
+			} else if (a_draft.reqType == kReqPerk) {
+				const auto ref = req.value("perk", "");
+				auto*      form = LookupFormString(ref);
+				auto*      perk = form ? form->As<RE::BGSPerk>() : nullptr;
+				a_draft.reqPerk = -1;
+				CopyTo(a_draft.reqRef, ref);
+				for (int skill = 0; perk && skill < static_cast<int>(kSkills.size()) && a_draft.reqPerk < 0; ++skill) {
+					const auto perks = PerksOfTree(skill);
+					if (const auto it = std::ranges::find(perks, perk); it != perks.end()) {
+						a_draft.reqSkill = skill;
+						a_draft.reqPerk = static_cast<int>(it - perks.begin());
+					}
+				}
 			} else if (a_draft.reqType == kReqBlessing) {
 				const auto god = Normalise(req.value("god", ""));
 				for (int i = 0; i < static_cast<int>(kGods.size()); ++i) {
@@ -334,6 +390,12 @@ namespace IOD::Edit
 			case kReqQuest:
 				req["quest"] = a_draft.reqQuest == kQuestOther ? std::string(a_draft.reqRef) : std::string(kQuests[static_cast<std::size_t>(a_draft.reqQuest)].ref);
 				break;
+			case kReqPerk:
+				{
+					auto* perk = DraftPerk(a_draft);
+					req["perk"] = perk ? FormString(perk) : std::string(a_draft.reqRef);
+					break;
+				}
 			case kReqBlessing:
 				req["god"] = kGods[static_cast<std::size_t>(std::clamp(a_draft.reqGod, 0, static_cast<int>(kGods.size()) - 1))];
 				break;

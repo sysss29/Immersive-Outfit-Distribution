@@ -237,6 +237,9 @@ namespace IOD::Papyrus
 			if (field == "reqfaction") {
 				return d.reqFaction;
 			}
+			if (field == "reqperk") {  // index in PerkChoices; the last entry means "other"
+				return d.reqPerk < 0 ? static_cast<std::int32_t>(PerksOfTree(d.reqSkill).size()) : d.reqPerk;
+			}
 			if (field == "reqgod") {
 				return d.reqGod;
 			}
@@ -279,7 +282,13 @@ namespace IOD::Papyrus
 					d.reqValue = std::clamp(a_value, 0, std::max(0, MaxFactionRank(d)));
 				}
 			} else if (field == "reqskill") {
+				if (a_value != d.reqSkill) {
+					d.reqPerk = 0;  // a different tree: start at its first perk
+				}
 				d.reqSkill = std::clamp(a_value, 0, static_cast<int>(kSkills.size()) - 1);
+			} else if (field == "reqperk") {
+				const auto count = static_cast<int>(PerksOfTree(d.reqSkill).size());
+				d.reqPerk = a_value >= count ? -1 : std::max(0, a_value);
 			} else if (field == "reqgod") {
 				d.reqGod = std::clamp(a_value, 0, static_cast<int>(kGods.size()) - 1);
 			} else if (field == "reqquest") {
@@ -310,6 +319,10 @@ namespace IOD::Papyrus
 			}
 			if (field == "reqrefcheck") {  // what the reference points to
 				auto* form = LookupFormString(d.reqQuest == kQuestOther ? std::string_view(d.reqRef) : std::string_view(kQuests[static_cast<std::size_t>(d.reqQuest)].ref));
+				if (d.reqType == kReqPerk) {
+					auto* perk = DraftPerk(d);
+					return perk ? Safe(fmt::format("Perk: {}", PerkLabel(perk))) : "No perk found: set stays hidden";
+				}
 				if (d.reqType == kReqQuest) {
 					auto* quest = form ? form->As<RE::TESQuest>() : nullptr;
 					return quest ? Safe(fmt::format("Quest: {}", quest->GetName())) : "No quest found with that ID.";
@@ -386,6 +399,20 @@ namespace IOD::Papyrus
 			return out;
 		}
 
+		std::vector<String> PerkChoices(Tag*, std::int32_t a_index)
+		{
+			std::scoped_lock    lock(Lock());
+			std::vector<String> out;
+			Draft               d;
+			if (Load(d, a_index)) {
+				for (auto* perk : PerksOfTree(d.reqSkill)) {
+					out.emplace_back(Safe(PerkLabel(perk)));
+				}
+			}
+			out.emplace_back("Other (enter editor ID or form)");
+			return out;
+		}
+
 		void ReloadFiles(Tag*)
 		{
 			std::scoped_lock lock(Lock());
@@ -411,6 +438,7 @@ namespace IOD::Papyrus
 			a_vm->RegisterFunction("SetText", kScript, SetText);
 			a_vm->RegisterFunction("Choices", kScript, Choices);
 			a_vm->RegisterFunction("ReloadFiles", kScript, ReloadFiles);
+			a_vm->RegisterFunction("PerkChoices", kScript, PerkChoices);
 			spdlog::info("Papyrus functions registered for the MCM");
 			return true;
 		}

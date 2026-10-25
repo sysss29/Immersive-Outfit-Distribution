@@ -299,6 +299,39 @@ namespace IOD::UI
 					}
 					break;
 				}
+			case kReqPerk:
+				{
+					ImGui::SetNextItemWidth(180.0f);
+					if (ImGui::Combo("Skill tree", &g_draft.reqSkill, kSkills.data(), static_cast<int>(kSkills.size()))) {
+						g_draft.reqPerk = 0;
+						g_draft.dirty = true;
+					}
+					const auto               perks = PerksOfTree(g_draft.reqSkill);
+					std::vector<std::string> labels;
+					for (auto* perk : perks) {
+						labels.push_back(PerkLabel(perk));
+					}
+					labels.emplace_back("Other (enter editor ID or form)");
+					std::vector<const char*> items;
+					for (const auto& l : labels) {
+						items.push_back(l.c_str());
+					}
+					int index = g_draft.reqPerk < 0 ? static_cast<int>(perks.size()) : g_draft.reqPerk;
+					ImGui::SetNextItemWidth(260.0f);
+					if (ImGui::Combo("Perk", &index, items.data(), static_cast<int>(items.size()))) {
+						g_draft.reqPerk = index >= static_cast<int>(perks.size()) ? -1 : index;
+						g_draft.dirty = true;
+					}
+					if (g_draft.reqPerk < 0) {
+						g_draft.dirty |= ImGui::InputTextWithHint("Perk form", "Plugin.esp|0x123", g_draft.reqRef, sizeof(g_draft.reqRef));
+					}
+					if (auto* perk = DraftPerk(g_draft)) {
+						ImGui::TextColored(kGood, "Perk: %s", PerkLabel(perk).c_str());
+					} else {
+						ImGui::TextColored(kWarn, "No perk found; the set stays hidden until this is fixed.");
+					}
+					break;
+				}
 			case kReqBlessing:
 				ImGui::SetNextItemWidth(220.0f);
 				g_draft.dirty |= ImGui::Combo("God", &g_draft.reqGod, kGods.data(), static_cast<int>(kGods.size()));

@@ -91,6 +91,16 @@ namespace IOD
 			}
 			req.type = Requirement::Type::kQuest;
 			req.label = fmt::format("quest {} completed", ref);
+		} else if (type == "perk") {
+			const auto ref = a_json.value("perk", "");
+			req.form = LookupFormString(ref);
+			auto* perk = req.form ? req.form->As<RE::BGSPerk>() : nullptr;
+			if (!perk) {
+				spdlog::warn("{}: perk \"{}\" not found", a_context, ref);
+				return std::nullopt;
+			}
+			req.type = Requirement::Type::kPerk;
+			req.label = fmt::format("perk {}", perk->GetName());
 		} else if (type == "blessing") {
 			req.type = Requirement::Type::kBlessing;
 			req.label = fmt::format("blessed by {}", a_json.value("god", "?"));
@@ -127,6 +137,11 @@ namespace IOD
 			{
 				auto* quest = a_requirement.form ? a_requirement.form->As<RE::TESQuest>() : nullptr;
 				return quest && quest->IsCompleted();
+			}
+		case Requirement::Type::kPerk:
+			{
+				auto* perk = a_requirement.form ? a_requirement.form->As<RE::BGSPerk>() : nullptr;
+				return perk && a_player->HasPerk(perk);
 			}
 		case Requirement::Type::kBlessing:
 		case Requirement::Type::kInvalid:

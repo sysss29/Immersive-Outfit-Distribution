@@ -28,3 +28,5 @@ String Function SetText(Int aiSet, String asField, String asValue) Global Native
 ; lists: rarity, reqtype, skills, factions
 String[] Function Choices(String asList) Global Native
 Function ReloadFiles() Global Native
+; perks of the set's chosen skill tree, then "Other"
+String[] Function PerkChoices(Int aiSet) Global Native

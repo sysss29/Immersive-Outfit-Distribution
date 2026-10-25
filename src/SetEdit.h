@@ -9,7 +9,7 @@ namespace IOD::Edit
 	inline constexpr std::array kRarities{ "Common", "Rare", "Legendary" };
 
 	inline constexpr std::array kRequirementTypes{ "No requirement", "Character level", "Base Health", "Base Magicka", "Base Stamina",
-		"Skill level", "Faction rank", "Quest completed", "Blessing of a god" };
+		"Skill level", "Faction rank", "Quest completed", "Blessing of a god", "Has perk" };
 	enum Req : int
 	{
 		kReqNone,
@@ -20,9 +20,10 @@ namespace IOD::Edit
 		kReqSkill,
 		kReqFaction,
 		kReqQuest,
-		kReqBlessing
+		kReqBlessing,
+		kReqPerk
 	};
-	inline constexpr std::array kReqJsonTypes{ "", "level", "health", "magicka", "stamina", "skill", "faction", "quest", "blessing" };
+	inline constexpr std::array kReqJsonTypes{ "", "level", "health", "magicka", "stamina", "skill", "faction", "quest", "blessing", "perk" };
 
 	inline constexpr std::array kSkills{ "One-Handed", "Two-Handed", "Archery", "Block", "Smithing", "Heavy Armor", "Light Armor",
 		"Pickpocket", "Lockpicking", "Sneak", "Alchemy", "Speech", "Alteration", "Conjuration", "Destruction", "Illusion",
@@ -68,6 +69,11 @@ namespace IOD::Edit
 	inline constexpr int kQuestOther = static_cast<int>(kQuests.size()) - 1;
 	std::string QuestLabel(int a_index);  // "Thieves Guild finale: Darkness Returns"
 
+	// Perks of a skill tree (index into kSkills), in tree order, every rank listed. Read from the
+	// game, so perk overhauls (e.g. Paths of Empyrean) show their own perks.
+	std::vector<RE::BGSPerk*> PerksOfTree(int a_skill);
+	std::string               PerkLabel(const RE::BGSPerk* a_perk);
+
 	inline constexpr int kFactionOther = static_cast<int>(kFactions.size()) - 1;
 
 
@@ -100,6 +106,7 @@ namespace IOD::Edit
 		int                      reqFaction{ 0 };
 		int                      reqGod{ 0 };
 		int                      reqQuest{ 0 };
+		int                      reqPerk{ 0 };  // index in PerksOfTree(reqSkill); -1: other (reqRef)
 		char                     reqRef[128]{};
 		bool                     dirty{ false };
 		bool                     confirmDelete{ false };
@@ -128,6 +135,7 @@ namespace IOD::Edit
 	std::string                         SourceWarning(const std::vector<RE::TESObjectARMO*>& a_pieces, Source a_source);
 	int                                 MaxFactionRank(const Draft& a_draft);  // -1: faction not found
 
+	RE::BGSPerk*   DraftPerk(const Draft& a_draft);  // the chosen perk, or null
 	void           LoadDraft(Draft& a_draft, std::size_t a_file, std::size_t a_index);
 	void           NewDraft(Draft& a_draft, std::string a_name, std::string a_outfit, std::vector<std::string> a_pieces);
 	nlohmann::json DraftToJson(Draft& a_draft);
