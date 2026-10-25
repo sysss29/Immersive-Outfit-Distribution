@@ -271,10 +271,24 @@ namespace IOD::UI
 					} else {
 						ImGui::TextDisabled("%s has no rank ladder: rank 0 means you are a member.", faction->GetName());
 					}
+					ImGui::TextDisabled("Vanilla guilds track progress through quests more than ranks: see Quest completed.");
 					break;
 				}
 			case kReqQuest:
 				{
+					std::vector<std::string> labels;
+					std::vector<const char*> items;
+					for (int i = 0; i <= kQuestOther; ++i) {
+						labels.push_back(QuestLabel(i));
+					}
+					for (const auto& l : labels) {
+						items.push_back(l.c_str());
+					}
+					ImGui::SetNextItemWidth(320.0f);
+					g_draft.dirty |= ImGui::Combo("Quest", &g_draft.reqQuest, items.data(), static_cast<int>(items.size()));
+					if (g_draft.reqQuest != kQuestOther) {
+						break;
+					}
 					g_draft.dirty |= ImGui::InputTextWithHint("Quest form", "MQ202 or Plugin.esp|0x123", g_draft.reqRef, sizeof(g_draft.reqRef));
 					auto* form = LookupFormString(g_draft.reqRef);
 					auto* quest = form ? form->As<RE::TESQuest>() : nullptr;
@@ -286,7 +300,8 @@ namespace IOD::UI
 					break;
 				}
 			case kReqBlessing:
-				g_draft.dirty |= ImGui::InputTextWithHint("God", "Mara", g_draft.reqRef, sizeof(g_draft.reqRef));
+				ImGui::SetNextItemWidth(220.0f);
+				g_draft.dirty |= ImGui::Combo("God", &g_draft.reqGod, kGods.data(), static_cast<int>(kGods.size()));
 				ImGui::TextColored(kWarn, "Shrines arrive in milestone 4; until then this set stays hidden.");
 				break;
 			default:

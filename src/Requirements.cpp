@@ -129,6 +129,7 @@ namespace IOD
 				return quest && quest->IsCompleted();
 			}
 		case Requirement::Type::kBlessing:
+		case Requirement::Type::kInvalid:
 			return false;
 		}
 		return false;

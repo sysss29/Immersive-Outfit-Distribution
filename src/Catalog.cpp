@@ -232,7 +232,9 @@ namespace IOD
 				if (auto req = ParseRequirement(entry["requirement"], context)) {
 					set.requirement = std::move(*req);
 				} else {
-					spdlog::warn("{}: requirement ignored", context);
+					set.requirement.type = Requirement::Type::kInvalid;
+					set.requirement.label = "invalid requirement";
+					spdlog::warn("{}: requirement can't be used; the set stays hidden until it's fixed", context);
 				}
 			}
 			set.unique = entry.value("unique", true);

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.21)
 
 project(
     ImmersiveOutfitDistribution
-    VERSION 0.3.1
+    VERSION 0.3.2
     DESCRIPTION "Immersive Outfit Distribution: curated outfits sold by Skyrim vendors and granted at shrines."
     LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)

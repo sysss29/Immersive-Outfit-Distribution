@@ -13,6 +13,7 @@ Int Property REQ_FACTION = 6 AutoReadOnly
 Int Property REQ_QUEST = 7 AutoReadOnly
 Int Property REQ_BLESSING = 8 AutoReadOnly
 Int Property FACTION_OTHER = 8 AutoReadOnly
+Int Property QUEST_OTHER = 6 AutoReadOnly
 
 Int selected = -1
 Int[] listIds
@@ -34,6 +35,8 @@ Int oReqType = -1
 Int oReqValue = -1
 Int oReqSkill = -1
 Int oReqFaction = -1
+Int oReqGod = -1
+Int oReqQuest = -1
 Int oReqRef = -1
 Int oReload = -1
 Int oRedraw = -1
@@ -88,6 +91,8 @@ Function ClearIds()
 	oReqValue = -1
 	oReqSkill = -1
 	oReqFaction = -1
+	oReqGod = -1
+	oReqQuest = -1
 	oReqRef = -1
 	oReload = -1
 	oRedraw = -1
@@ -208,11 +213,18 @@ Function ShowEditor()
 		Else
 			AddTextOption("Faction not found", "", OPTION_FLAG_DISABLED)
 		EndIf
+		AddTextOption("Guild progress: see Quest completed", "", OPTION_FLAG_DISABLED)
 	ElseIf t == REQ_QUEST
-		oReqRef = AddInputOption("Quest", IOD_Native.GetText(s, "reqref"))
+		String[] quests = ListOf("quests")
+		Int q = IOD_Native.GetInt(s, "reqquest")
+		oReqQuest = AddMenuOption("Quest", quests[q])
+		If q == QUEST_OTHER
+			oReqRef = AddInputOption("Editor ID or form", IOD_Native.GetText(s, "reqref"))
+		EndIf
 		AddTextOption(IOD_Native.GetText(s, "reqrefcheck"), "", OPTION_FLAG_DISABLED)
 	ElseIf t == REQ_BLESSING
-		oReqRef = AddInputOption("God", IOD_Native.GetText(s, "reqref"))
+		String[] gods = ListOf("gods")
+		oReqGod = AddMenuOption("God", gods[IOD_Native.GetInt(s, "reqgod")])
 		AddTextOption("Shrines come in milestone 4", "", OPTION_FLAG_DISABLED)
 	EndIf
 	AddEmptyOption()
@@ -393,6 +405,14 @@ Event OnOptionMenuOpen(Int aiOption)
 		SetMenuDialogOptions(ListOf("skills"))
 		SetMenuDialogStartIndex(IOD_Native.GetInt(selected, "reqskill"))
 		SetMenuDialogDefaultIndex(0)
+	ElseIf aiOption == oReqGod
+		SetMenuDialogOptions(ListOf("gods"))
+		SetMenuDialogStartIndex(IOD_Native.GetInt(selected, "reqgod"))
+		SetMenuDialogDefaultIndex(0)
+	ElseIf aiOption == oReqQuest
+		SetMenuDialogOptions(ListOf("quests"))
+		SetMenuDialogStartIndex(IOD_Native.GetInt(selected, "reqquest"))
+		SetMenuDialogDefaultIndex(0)
 	ElseIf aiOption == oReqFaction
 		SetMenuDialogOptions(ListOf("factions"))
 		SetMenuDialogStartIndex(IOD_Native.GetInt(selected, "reqfaction"))
@@ -410,6 +430,10 @@ Event OnOptionMenuAccept(Int aiOption, Int aiIndex)
 		Report(IOD_Native.SetInt(selected, "reqtype", aiIndex))
 	ElseIf aiOption == oReqSkill
 		Report(IOD_Native.SetInt(selected, "reqskill", aiIndex))
+	ElseIf aiOption == oReqGod
+		Report(IOD_Native.SetInt(selected, "reqgod", aiIndex))
+	ElseIf aiOption == oReqQuest
+		Report(IOD_Native.SetInt(selected, "reqquest", aiIndex))
 	ElseIf aiOption == oReqFaction
 		Report(IOD_Native.SetInt(selected, "reqfaction", aiIndex))
 	EndIf

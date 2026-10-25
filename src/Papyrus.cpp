@@ -237,6 +237,12 @@ namespace IOD::Papyrus
 			if (field == "reqfaction") {
 				return d.reqFaction;
 			}
+			if (field == "reqgod") {
+				return d.reqGod;
+			}
+			if (field == "reqquest") {
+				return d.reqQuest;
+			}
 			if (field == "maxrank") {
 				return MaxFactionRank(d);
 			}
@@ -274,6 +280,10 @@ namespace IOD::Papyrus
 				}
 			} else if (field == "reqskill") {
 				d.reqSkill = std::clamp(a_value, 0, static_cast<int>(kSkills.size()) - 1);
+			} else if (field == "reqgod") {
+				d.reqGod = std::clamp(a_value, 0, static_cast<int>(kGods.size()) - 1);
+			} else if (field == "reqquest") {
+				d.reqQuest = std::clamp(a_value, 0, kQuestOther);
 			} else if (field == "reqfaction") {
 				d.reqFaction = std::clamp(a_value, 0, kFactionOther);
 				d.reqValue = std::clamp(d.reqValue, 0, std::max(0, MaxFactionRank(d)));
@@ -299,7 +309,7 @@ namespace IOD::Papyrus
 				return Safe(d.reqRef);
 			}
 			if (field == "reqrefcheck") {  // what the reference points to
-				auto* form = LookupFormString(d.reqRef);
+				auto* form = LookupFormString(d.reqQuest == kQuestOther ? std::string_view(d.reqRef) : std::string_view(kQuests[static_cast<std::size_t>(d.reqQuest)].ref));
 				if (d.reqType == kReqQuest) {
 					auto* quest = form ? form->As<RE::TESQuest>() : nullptr;
 					return quest ? Safe(fmt::format("Quest: {}", quest->GetName())) : "No quest found with that ID.";
@@ -358,6 +368,14 @@ namespace IOD::Papyrus
 			} else if (list == "skills") {
 				for (const auto* s : kSkills) {
 					out.emplace_back(s);
+				}
+			} else if (list == "gods") {
+				for (const auto* g : kGods) {
+					out.emplace_back(g);
+				}
+			} else if (list == "quests") {
+				for (int i = 0; i <= kQuestOther; ++i) {
+					out.emplace_back(Safe(QuestLabel(i)));
 				}
 			} else if (list == "factions") {
 				for (const auto& f : kFactions) {

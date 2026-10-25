@@ -24,6 +24,18 @@ namespace IOD::Edit
 		return out;
 	}
 
+	std::string QuestLabel(int a_index)
+	{
+		const auto& known = kQuests[static_cast<std::size_t>(std::clamp(a_index, 0, kQuestOther))];
+		if (a_index >= kQuestOther) {
+			return known.label;
+		}
+		auto* form = LookupFormString(known.ref);
+		auto* quest = form ? form->As<RE::TESQuest>() : nullptr;
+		const char* name = quest ? quest->GetName() : nullptr;
+		return name && *name ? fmt::format("{}: {}", known.label, name) : fmt::format("{} ({})", known.label, known.ref);
+	}
+
 	int MaxFactionRank(const Draft& a_draft)
 	{
 		const char* ref = a_draft.reqFaction == kFactionOther ? a_draft.reqRef : kFactions[static_cast<std::size_t>(a_draft.reqFaction)].ref;
@@ -240,9 +252,22 @@ namespace IOD::Edit
 				}
 				CopyTo(a_draft.reqRef, ref);
 			} else if (a_draft.reqType == kReqQuest) {
-				CopyTo(a_draft.reqRef, req.value("quest", ""));
+				const auto ref = req.value("quest", "");
+				auto*      form = LookupFormString(ref);
+				a_draft.reqQuest = kQuestOther;
+				for (int i = 0; i < kQuestOther; ++i) {
+					if (form && LookupFormString(kQuests[static_cast<std::size_t>(i)].ref) == form) {
+						a_draft.reqQuest = i;
+					}
+				}
+				CopyTo(a_draft.reqRef, ref);
 			} else if (a_draft.reqType == kReqBlessing) {
-				CopyTo(a_draft.reqRef, req.value("god", ""));
+				const auto god = Normalise(req.value("god", ""));
+				for (int i = 0; i < static_cast<int>(kGods.size()); ++i) {
+					if (Normalise(kGods[static_cast<std::size_t>(i)]) == god) {
+						a_draft.reqGod = i;
+					}
+				}
 			}
 		}
 	}
@@ -307,10 +332,10 @@ namespace IOD::Edit
 				req["rank"] = a_draft.reqValue;
 				break;
 			case kReqQuest:
-				req["quest"] = std::string(a_draft.reqRef);
+				req["quest"] = a_draft.reqQuest == kQuestOther ? std::string(a_draft.reqRef) : std::string(kQuests[static_cast<std::size_t>(a_draft.reqQuest)].ref);
 				break;
 			case kReqBlessing:
-				req["god"] = std::string(a_draft.reqRef);
+				req["god"] = kGods[static_cast<std::size_t>(std::clamp(a_draft.reqGod, 0, static_cast<int>(kGods.size()) - 1))];
 				break;
 			default:
 				req["value"] = a_draft.reqValue;

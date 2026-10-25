@@ -44,6 +44,30 @@ namespace IOD::Edit
 		KnownFaction{ "Vampires (Volkihar)", "Dawnguard.esm|0x3376" },
 		KnownFaction{ "Other (enter form ID)", "" },
 	};
+	// Gods whose blessing a set can require (milestone 4 shrines): the Nine, then the Daedra.
+	inline constexpr std::array kGods{ "Akatosh", "Arkay", "Dibella", "Julianos", "Kynareth", "Mara", "Stendarr", "Talos",
+		"Zenithar", "Azura", "Boethiah", "Clavicus Vile", "Hermaeus Mora", "Hircine", "Malacath", "Mehrunes Dagon", "Mephala",
+		"Meridia", "Molag Bal", "Namira", "Nocturnal", "Peryite", "Sanguine", "Sheogorath", "Vaermina" };
+
+	// Quest milestones offered in the Quest completed list (editor IDs checked against Skyrim.esm);
+	// the label shown adds the quest's in-game name.
+	struct KnownQuest
+	{
+		const char* label;
+		const char* ref;
+	};
+	inline constexpr std::array kQuests{
+		KnownQuest{ "Main quest finale", "MQ305" },
+		KnownQuest{ "Thieves Guild finale", "TG09" },
+		KnownQuest{ "Thieves Guild leadership", "TGLeadership" },
+		KnownQuest{ "Companions finale", "C06" },
+		KnownQuest{ "College of Winterhold finale", "MG08" },
+		KnownQuest{ "Dark Brotherhood finale", "DB11" },
+		KnownQuest{ "Other (enter editor ID or form)", "" },
+	};
+	inline constexpr int kQuestOther = static_cast<int>(kQuests.size()) - 1;
+	std::string QuestLabel(int a_index);  // "Thieves Guild finale: Darkness Returns"
+
 	inline constexpr int kFactionOther = static_cast<int>(kFactions.size()) - 1;
 
 
@@ -74,6 +98,8 @@ namespace IOD::Edit
 		int                      reqValue{ 0 };
 		int                      reqSkill{ 0 };
 		int                      reqFaction{ 0 };
+		int                      reqGod{ 0 };
+		int                      reqQuest{ 0 };
 		char                     reqRef[128]{};
 		bool                     dirty{ false };
 		bool                     confirmDelete{ false };
