@@ -38,6 +38,9 @@ namespace IOD
 			return std::nullopt;
 		}
 
+		// Each piece's value before IOD priced it, so a reload can undo a removed price.
+		std::unordered_map<RE::TESObjectARMO*, std::int32_t> g_originalValues;
+
 		void AddPiece(OutfitSet& a_set, RE::TESObjectARMO* a_armor)
 		{
 			if (a_armor && std::ranges::find(a_set.pieces, a_armor) == a_set.pieces.end()) {
@@ -67,6 +70,16 @@ namespace IOD
 		}
 		auto* data = RE::TESDataHandler::GetSingleton();
 		return data ? data->LookupForm(localID & 0x00FFFFFF, plugin) : nullptr;
+	}
+
+	std::string FormString(const RE::TESForm* a_form)
+	{
+		const auto* file = a_form ? a_form->GetFile(0) : nullptr;
+		if (!file) {
+			return {};
+		}
+		const auto local = file->IsLight() ? (a_form->GetFormID() & 0xFFF) : (a_form->GetFormID() & 0xFFFFFF);
+		return fmt::format("{}|0x{:X}", file->GetFilename(), local);
 	}
 
 	bool OutfitSet::HasSource(Source a_source) const
@@ -230,6 +243,9 @@ namespace IOD
 	// they have none). Base values are global, so a piece in two priced sets takes the last one.
 	void Catalog::ApplyPrices()
 	{
+		for (const auto& [piece, value] : g_originalValues) {
+			piece->value = value;
+		}
 		std::unordered_map<RE::TESObjectARMO*, std::string> pricedBy;
 		for (const auto& set : _sets) {
 			if (!set.price) {
@@ -256,6 +272,7 @@ namespace IOD
 					spdlog::warn("{}: piece also priced by {}; the last one wins", set.id, it->second);
 				}
 				pricedBy[piece] = set.id;
+				g_originalValues.try_emplace(piece, piece->value);
 				piece->value = value;
 			}
 			spdlog::info("{}: priced at {} gold", set.id, *set.price);

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.21)
 
 project(
     ImmersiveOutfitDistribution
-    VERSION 0.1.4
+    VERSION 0.2.0
     DESCRIPTION "Immersive Outfit Distribution: curated outfits sold by Skyrim vendors and granted at shrines."
     LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
@@ -30,6 +30,9 @@ set(sources
     src/Sources.cpp
     src/Stocker.cpp
     src/State.cpp
+    src/SetFiles.cpp
+    src/Settings.cpp
+    src/UI.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/version.rc)
 
 set(headers
@@ -38,13 +41,17 @@ set(headers
     src/Requirements.h
     src/Sources.h
     src/Stocker.h
-    src/State.h)
+    src/State.h
+    src/SetFiles.h
+    src/Settings.h
+    src/UI.h
+    include/SKSEMenuFramework.h)
 
 add_commonlibsse_plugin(${PROJECT_NAME}
     AUTHOR "sysss29"
     SOURCES ${headers} ${sources})
 
-target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(${PROJECT_NAME} PRIVATE nlohmann_json::nlohmann_json spdlog::spdlog)
 target_precompile_headers(${PROJECT_NAME} PRIVATE src/PCH.h)
 

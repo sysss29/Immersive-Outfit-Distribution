@@ -1,7 +1,9 @@
 #include "Catalog.h"
+#include "Settings.h"
 #include "Sources.h"
 #include "State.h"
 #include "Stocker.h"
+#include "UI.h"
 
 namespace
 {
@@ -26,10 +28,12 @@ namespace
 	void OnMessage(SKSE::MessagingInterface::Message* a_message)
 	{
 		if (a_message->type == SKSE::MessagingInterface::kDataLoaded) {
+			IOD::Settings::Get().Load();
 			IOD::ResolveVendorFactions();
 			IOD::Catalog::GetSingleton().Load();
 			IOD::Stocker::CheckTradeable();
 			IOD::Stocker::Install();
+			IOD::UI::Register();
 		} else if (a_message->type == SKSE::MessagingInterface::kPostLoadGame ||
 				   a_message->type == SKSE::MessagingInterface::kNewGame) {
 			IOD::Stocker::OnGameLoaded();
@@ -41,7 +45,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 {
 	SKSE::Init(a_skse);
 	InitLogging();
-	spdlog::info("Immersive Outfit Distribution 0.1.4 on Skyrim {}", REL::Module::get().version().string());
+	spdlog::info("Immersive Outfit Distribution 0.2.0 on Skyrim {}", REL::Module::get().version().string());
 
 	IOD::State::Register();
 	if (!SKSE::GetMessagingInterface()->RegisterListener(OnMessage)) {

@@ -8,25 +8,27 @@ namespace IOD
 		{
 			RE::FormID       localID;
 			std::string_view plugin;
+			std::string_view label;
 		};
 
 		// Vendor factions verified against Skyrim.esm (see docs/game-data.md).
 		constexpr std::array kRadiantRaiment{
-			VendorFactionID{ 0x0A6C00, "Skyrim.esm"sv },  // ServicesSolitudeRadiantRaiments (Endarie, Taarie)
+			VendorFactionID{ 0x0A6C00, "Skyrim.esm"sv, "Endarie & Taarie (Solitude)"sv },  // ServicesSolitudeRadiantRaiments (Endarie, Taarie)
 		};
 		constexpr std::array kKhajiitCaravans{
-			VendorFactionID{ 0x074351, "Skyrim.esm"sv },  // CaravanALeader (Ri'saad)
-			VendorFactionID{ 0x074352, "Skyrim.esm"sv },  // CaravanBLeader (Ma'dran)
-			VendorFactionID{ 0x074354, "Skyrim.esm"sv },  // CaravanCLeader (Ahkari)
+			VendorFactionID{ 0x074351, "Skyrim.esm"sv, "Ri'saad's caravan"sv },  // CaravanALeader (Ri'saad)
+			VendorFactionID{ 0x074352, "Skyrim.esm"sv, "Ma'dran's caravan"sv },  // CaravanBLeader (Ma'dran)
+			VendorFactionID{ 0x074354, "Skyrim.esm"sv, "Ahkari's caravan"sv },  // CaravanCLeader (Ahkari)
 		};
 		constexpr std::array kThievesGuild{
-			VendorFactionID{ 0x0D54C4, "Skyrim.esm"sv },  // ServicesThievesGuildTonilia
-			VendorFactionID{ 0x0D8E53, "Skyrim.esm"sv },  // ServicesThievesGuildCaravanAtahba
-			VendorFactionID{ 0x0D8E52, "Skyrim.esm"sv },  // ServicesThievesGuildCaravanMajhad
-			VendorFactionID{ 0x0D8E54, "Skyrim.esm"sv },  // ServicesThievesGuildCaravanZaynabi
+			VendorFactionID{ 0x0D54C4, "Skyrim.esm"sv, "Tonilia (Riften)"sv },  // ServicesThievesGuildTonilia
+			VendorFactionID{ 0x0D8E53, "Skyrim.esm"sv, "Atahbah (fence)"sv },  // ServicesThievesGuildCaravanAtahba
+			VendorFactionID{ 0x0D8E52, "Skyrim.esm"sv, "Ma'jhad (fence)"sv },  // ServicesThievesGuildCaravanMajhad
+			VendorFactionID{ 0x0D8E54, "Skyrim.esm"sv, "Zaynabi (fence)"sv },  // ServicesThievesGuildCaravanZaynabi
 		};
 
 		std::map<Source, std::vector<RE::TESFaction*>> g_factions;
+		std::unordered_map<const RE::TESFaction*, std::string_view> g_labels;
 
 		template <std::size_t N>
 		void Resolve(Source a_source, const std::array<VendorFactionID, N>& a_ids)
@@ -38,6 +40,7 @@ namespace IOD
 				auto* faction = data ? data->LookupForm<RE::TESFaction>(id.localID, id.plugin) : nullptr;
 				if (faction) {
 					list.push_back(faction);
+					g_labels[faction] = id.label;
 				} else {
 					spdlog::warn("Vendor faction {:06X} in {} not found", id.localID, id.plugin);
 				}
@@ -54,6 +57,12 @@ namespace IOD
 			}
 			return out;
 		}
+	}
+
+	std::string_view VendorLabel(const RE::TESFaction* a_faction)
+	{
+		const auto it = g_labels.find(a_faction);
+		return it != g_labels.end() ? it->second : "?"sv;
 	}
 
 	std::string_view SourceName(Source a_source)

@@ -34,7 +34,7 @@ namespace IOD
 	public:
 		static Catalog& GetSingleton();
 
-		void Load();
+		void Load();  // also used to reload after the settings page saves
 
 		[[nodiscard]] const std::vector<OutfitSet>& Sets() const { return _sets; }
 		[[nodiscard]] const OutfitSet*              Find(std::string_view a_id) const;
@@ -48,4 +48,5 @@ namespace IOD
 
 	// "Skyrim.esm|0x12EB7" or "0x12EB7~Skyrim.esm" (local form ID, hex). Works with ESL plugins.
 	RE::TESForm* LookupFormString(std::string_view a_text);
+	std::string  FormString(const RE::TESForm* a_form);  // the reverse: "Plugin.esp|0xID"
 }

@@ -6,7 +6,7 @@ sold as full sets by vendors who fit their style, on a 48-hour rotation, instead
 
 Personal project for Skyrim SE **1.7.104** (SKSE 2.3.1). No support is offered.
 
-## Status: milestone 1
+## Status: milestone 2
 
 - Full sets stocked at **Radiant Raiment** (Endarie and Taarie, Solitude), **Khajiit caravans**
   and **Thieves Guild** fences.
@@ -27,6 +27,17 @@ Personal project for Skyrim SE **1.7.104** (SKSE 2.3.1). No support is offered.
 3. Recommended: SOES-NG in Immersive inventory mode, so outfits must be owned to be worn.
 
 ## Configuring sets
+
+In game: press F1 (SKSE Menu Framework) and open **Immersive Outfit Distribution**:
+
+- **Sets**: every set, with where it's sold and warnings (e.g. armour placed at Radiant Raiment);
+  click one to edit sources, rarity, price, requirement and pieces. Saving applies at once.
+- **New set**: pick a mod, then one of its outfit records or a hand-picked list of pieces.
+- **Vendors**: what each vendor has this 48-hour period, and **Redraw now** for testing.
+- **Settings**: the "New arrivals" message, and a testing option that gives every vendor at
+  least one set per period (saved in `SKSE/Plugins/ImmersiveOutfitDistribution.json`).
+
+By hand:
 
 Every `*.json` file in `SKSE/Plugins/ImmersiveOutfitDistribution/` is read at game start. See
 `config/MyOutfits.json` for the format and all options. An in-game configuration screen comes in

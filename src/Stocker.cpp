@@ -1,6 +1,7 @@
 #include "Stocker.h"
 
 #include "Catalog.h"
+#include "Settings.h"
 #include "State.h"
 
 namespace IOD
@@ -22,6 +23,11 @@ namespace IOD
 			}
 			return 1.0;
 		}
+
+		std::mutex                       g_snapshotLock;
+		std::vector<Stocker::VendorLine> g_snapshot;
+		std::int32_t                     g_snapshotPeriod{ -1 };
+		std::uint32_t                    g_redraws{ 0 };  // varies the draw after "Redraw now"
 
 		// Pieces IOD has put into each merchant chest's base container (not saved: rebuilt on load).
 		std::unordered_map<RE::TESObjectCONT*, std::vector<RE::TESBoundObject*>> g_baseEntries;
@@ -122,13 +128,18 @@ namespace IOD
 	// at a vendor only if every piece is one that vendor trades.
 	bool Stocker::CanTrade(const OutfitSet& a_set, RE::TESFaction* a_faction)
 	{
-		auto* list = a_faction->vendorData.vendorSellBuyList;
+		return CanTradePieces(a_set.pieces, a_faction);
+	}
+
+	bool Stocker::CanTradePieces(const std::vector<RE::TESObjectARMO*>& a_pieces, RE::TESFaction* a_faction)
+	{
+		auto* list = a_faction ? a_faction->vendorData.vendorSellBuyList : nullptr;
 		if (!list) {
 			return true;  // no list: the vendor trades anything
 		}
 		const bool excluding = a_faction->vendorData.vendorValues.notBuySell;
-		for (auto* piece : a_set.pieces) {
-			auto*      form = piece->As<RE::BGSKeywordForm>();
+		for (auto* piece : a_pieces) {
+			auto*      form = piece ? piece->As<RE::BGSKeywordForm>() : nullptr;
 			const bool listed = form && std::ranges::any_of(list->forms, [&](RE::TESForm* a_form) {
 				auto* keyword = a_form ? a_form->As<RE::BGSKeyword>() : nullptr;
 				return keyword && form->HasKeyword(keyword);
@@ -202,6 +213,7 @@ namespace IOD
 		// what the previous save's period put in and adds the loaded save's allocation.
 		SyncBaseContainers();
 		spdlog::info("Base containers synced for period {}", CurrentPeriod());
+		UpdateSnapshot();
 	}
 
 	// Writes the current period's pieces into each vendor chest's base container. The game
@@ -294,7 +306,7 @@ namespace IOD
 			}
 			if (ids.empty()) {
 				spdlog::info("Period {}: {} has no IOD stock this time", period, a_name);
-			} else {
+			} else if (Settings::Get().arrivalMessage) {
 				const auto source = SourceForFaction(a_faction);
 				const auto message = fmt::format("New arrivals at {}.", source ? SourceName(*source) : "this shop"sv);
 				RE::SendHUDMessage::ShowHUDMessage(message.c_str());
@@ -342,12 +354,15 @@ namespace IOD
 			}
 		}
 
-		std::mt19937                    rng(state.salt ^ (static_cast<std::uint32_t>(a_period) * 0x9E3779B1u));
+		std::mt19937                    rng(state.salt ^ (static_cast<std::uint32_t>(a_period) * 0x9E3779B1u) ^ (g_redraws * 0x85EBCA6Bu));
 		std::unordered_set<std::string> used;
 		for (const auto source : kAllSources) {
 			for (auto* faction : VendorFactions(source)) {
 				std::discrete_distribution<int> howMany(kCountWeights.begin(), kCountWeights.end());
 				int                             wanted = howMany(rng);
+				if (Settings::Get().guaranteeOnePerVendor) {
+					wanted = std::max(wanted, 1);
+				}
 				auto&                           picked = state.allocation[faction->GetFormID()];
 				while (wanted-- > 0) {
 					std::vector<const OutfitSet*> pool;
@@ -376,5 +391,69 @@ namespace IOD
 			}
 		}
 		spdlog::info("Period {}: allocated {} set(s) across vendors", a_period, used.size());
+		for (const auto source : kAllSources) {
+			for (auto* faction : VendorFactions(source)) {
+				std::string names;
+				for (const auto& id : state.allocation[faction->GetFormID()]) {
+					if (const auto* set = Catalog::GetSingleton().Find(id)) {
+						names += (names.empty() ? "" : ", ") + set->name;
+					}
+				}
+				spdlog::info("  {}: {}", VendorLabel(faction), names.empty() ? "nothing"s : names);
+			}
+		}
+		UpdateSnapshot();
+	}
+
+	void Stocker::UpdateSnapshot()
+	{
+		std::vector<VendorLine> lines;
+		const auto&             allocation = State::Get().allocation;
+		for (const auto source : kAllSources) {
+			for (auto* faction : VendorFactions(source)) {
+				VendorLine line{ std::string(VendorLabel(faction)), std::string(SourceName(source)), {} };
+				if (const auto it = allocation.find(faction->GetFormID()); it != allocation.end()) {
+					for (const auto& id : it->second) {
+						if (const auto* set = Catalog::GetSingleton().Find(id)) {
+							line.sets.push_back(set->name);
+						}
+					}
+				}
+				lines.push_back(std::move(line));
+			}
+		}
+		std::scoped_lock lock(g_snapshotLock);
+		g_snapshot = std::move(lines);
+		g_snapshotPeriod = State::Get().allocPeriod;
+	}
+
+	std::pair<std::int32_t, std::vector<Stocker::VendorLine>> Stocker::Snapshot()
+	{
+		std::scoped_lock lock(g_snapshotLock);
+		return { g_snapshotPeriod, g_snapshot };
+	}
+
+	// Game thread only. Forgets this period's draw; the next sync draws again and every vendor
+	// restocks the next time you talk to them.
+	void Stocker::Redraw()
+	{
+		auto& state = State::Get();
+		state.allocPeriod = -1;
+		state.stocked.clear();
+		++g_redraws;
+		SyncBaseContainers();
+		spdlog::info("Redrawn on request");
+	}
+
+	// Game thread only. Re-reads the set files (after the settings page saved them).
+	void Stocker::ReloadCatalog()
+	{
+		Catalog::GetSingleton().Load();
+		CheckTradeable();
+		auto* ui = RE::UI::GetSingleton();
+		if (ui && ui->IsMenuOpen(RE::MainMenu::MENU_NAME)) {
+			return;  // no game loaded: loading one syncs everything
+		}
+		OnGameLoaded();  // drops draws that became impossible, syncs base containers
 	}
 }

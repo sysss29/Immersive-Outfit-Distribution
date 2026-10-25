@@ -21,4 +21,5 @@ namespace IOD
 	void                                    ResolveVendorFactions();
 	const std::vector<RE::TESFaction*>&     VendorFactions(Source a_source);
 	std::optional<Source>                   SourceForFaction(const RE::TESFaction* a_faction);
+	std::string_view                        VendorLabel(const RE::TESFaction* a_faction);  // e.g. "Ri'saad's caravan"
 }
