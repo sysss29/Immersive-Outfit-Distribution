@@ -4,6 +4,7 @@
 #include "SetEdit.h"
 #include "SetFiles.h"
 #include "Settings.h"
+#include "Shrines.h"
 #include "Sources.h"
 #include "Stocker.h"
 
@@ -194,6 +195,34 @@ namespace IOD::UI
 					ImGui::TextColored(g_draft.sources[static_cast<std::size_t>(source)] ? kWarn : kDim, "%s", warning.c_str());
 				}
 				ImGui::PopID();
+			}
+			int shrineCount = 0;
+			for (const bool on : g_draft.gods) {
+				shrineCount += on ? 1 : 0;
+			}
+			const auto shrineLabel = fmt::format("Granted at shrines ({})###shrines", shrineCount);
+			if (ImGui::TreeNode(shrineLabel.c_str())) {
+				ImGui::TextDisabled("Carry the god's offering and pray at their shrine; the god gives one of their sets.");
+				for (int god = 0; god < static_cast<int>(kGods.size()); ++god) {
+					if (god == 0) {
+						ImGui::SeparatorText("The Nine Divines");
+					} else if (god == kDivineCount) {
+						ImGui::SeparatorText("Daedric princes");
+					}
+					ImGui::PushID(1000 + god);
+					auto& on = g_draft.gods[static_cast<std::size_t>(god)];
+					if (ImGui::Checkbox(kGods[static_cast<std::size_t>(god)], &on)) {
+						g_draft.dirty = true;
+					}
+					ImGui::SameLine(160.0f);
+					if (!Shrines::GetSingleton()->HasShrine(god)) {
+						ImGui::TextColored(on ? kWarn : kDim, "no shrine in your game");
+					} else {
+						ImGui::TextColored(on ? kGood : kDim, "%s", OfferingText(g_draft, god).c_str());
+					}
+					ImGui::PopID();
+				}
+				ImGui::TreePop();
 			}
 
 			ImGui::SetNextItemWidth(160.0f);
@@ -500,6 +529,11 @@ namespace IOD::UI
 									where += (where.empty() ? "" : ", ") + std::string(SourceName(*source));
 									if (warning.empty() && TradeCount(resolved.pieces, *source).first == 0 && !resolved.pieces.empty()) {
 										warning = fmt::format("never at {}", SourceName(*source));
+									}
+								} else if (const auto god = s.is_string() ? ParseGod(s.get<std::string>()) : std::nullopt) {
+									where += (where.empty() ? "" : ", ") + std::string(GodName(*god));
+									if (warning.empty() && !Shrines::GetSingleton()->HasShrine(*god)) {
+										warning = fmt::format("no shrine of {}", GodName(*god));
 									}
 								}
 							}

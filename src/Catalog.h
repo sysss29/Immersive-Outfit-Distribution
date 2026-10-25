@@ -12,18 +12,32 @@ namespace IOD
 		kLegendary,
 	};
 
+	// One line of an offering: any mix of the listed items, count in total (e.g. 3 wine, of
+	// either kind of wine bottle). Gold is an item too (Skyrim.esm|0xF).
+	struct OfferingItem
+	{
+		std::vector<RE::TESBoundObject*> any;
+		std::int32_t                     count{ 1 };
+	};
+	using Offering = std::vector<OfferingItem>;
+	std::optional<Offering> ParseOffering(const nlohmann::json& a_json, std::string_view a_context);
+	std::string             DescribeOffering(const Offering& a_offering);  // "Flawless Garnet, 250 gold"
+
 	struct OutfitSet
 	{
 		std::string                      id;    // "<file stem>/<name>", unique, used in the save
 		std::string                      name;
 		std::vector<RE::TESObjectARMO*>  pieces;
 		std::vector<Source>              sources;
+		std::vector<int>                 gods;      // shrines that grant it (Gods.h)
+		Offering                         offering;  // empty: the god's default for the rarity
 		Rarity                           rarity{ Rarity::kCommon };
 		std::optional<std::int32_t>      price;  // gold for the whole set
 		Requirement                      requirement;
 		bool                             unique{ true };
 
 		[[nodiscard]] bool HasSource(Source a_source) const;
+		[[nodiscard]] bool HasGod(int a_god) const { return std::ranges::find(gods, a_god) != gods.end(); }
 		[[nodiscard]] bool PlayerHasAllPieces(RE::PlayerCharacter* a_player) const;
 	};
 

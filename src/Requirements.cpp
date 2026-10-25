@@ -1,6 +1,8 @@
 #include "Requirements.h"
 
 #include "Catalog.h"
+#include "Gods.h"
+#include "State.h"
 
 namespace IOD
 {
@@ -102,9 +104,14 @@ namespace IOD
 			req.type = Requirement::Type::kPerk;
 			req.label = fmt::format("perk {}", perk->GetName());
 		} else if (type == "blessing") {
+			const auto god = ParseGod(a_json.value("god", ""));
+			if (!god) {
+				spdlog::warn("{}: unknown god \"{}\"", a_context, a_json.value("god", ""));
+				return std::nullopt;
+			}
 			req.type = Requirement::Type::kBlessing;
-			req.label = fmt::format("blessed by {}", a_json.value("god", "?"));
-			spdlog::info("{}: blessing requirements arrive with the shrines (milestone 4); hidden until then", a_context);
+			req.value = *god;
+			req.label = fmt::format("the blessing of {}", GodName(*god));
 		} else {
 			spdlog::warn("{}: unknown requirement type \"{}\"", a_context, type);
 			return std::nullopt;
@@ -144,6 +151,7 @@ namespace IOD
 				return perk && a_player->HasPerk(perk);
 			}
 		case Requirement::Type::kBlessing:
+			return State::Get().blessing == a_requirement.value;
 		case Requirement::Type::kInvalid:
 			return false;
 		}

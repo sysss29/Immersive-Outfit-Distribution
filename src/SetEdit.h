@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Gods.h"
 #include "Sources.h"
 
 // Set editing shared by the F1 page and the MCM: a Draft holds one set's fields, loaded from and
@@ -45,10 +46,6 @@ namespace IOD::Edit
 		KnownFaction{ "Vampires (Volkihar)", "Dawnguard.esm|0x3376" },
 		KnownFaction{ "Other (enter form ID)", "" },
 	};
-	// Gods whose blessing a set can require (milestone 4 shrines): the Nine, then the Daedra.
-	inline constexpr std::array kGods{ "Akatosh", "Arkay", "Dibella", "Julianos", "Kynareth", "Mara", "Stendarr", "Talos",
-		"Zenithar", "Azura", "Boethiah", "Clavicus Vile", "Hermaeus Mora", "Hircine", "Malacath", "Mehrunes Dagon", "Mephala",
-		"Meridia", "Molag Bal", "Namira", "Nocturnal", "Peryite", "Sanguine", "Sheogorath", "Vaermina" };
 
 	// Quest milestones offered in the Quest completed list (editor IDs checked against Skyrim.esm);
 	// the label shown adds the quest's in-game name.
@@ -97,6 +94,7 @@ namespace IOD::Edit
 		std::string              outfit;
 		std::vector<std::string> pieces;
 		std::array<bool, 3>      sources{};
+		std::array<bool, kGods.size()> gods{};  // shrines that grant it
 		int                      rarity{ 0 };
 		bool                     hasPrice{ false };
 		int                      price{ 1000 };
@@ -136,6 +134,7 @@ namespace IOD::Edit
 	int                                 MaxFactionRank(const Draft& a_draft);  // -1: faction not found
 
 	RE::BGSPerk*   DraftPerk(const Draft& a_draft);  // the chosen perk, or null
+	std::string    OfferingText(const Draft& a_draft, int a_god);  // what this god asks for the set
 	void           LoadDraft(Draft& a_draft, std::size_t a_file, std::size_t a_index);
 	void           NewDraft(Draft& a_draft, std::string a_name, std::string a_outfit, std::vector<std::string> a_pieces);
 	nlohmann::json DraftToJson(Draft& a_draft);

@@ -9,7 +9,9 @@ namespace IOD
 		std::int32_t  allocPeriod{ -1 };  // 48-hour period the allocation below belongs to
 		std::map<RE::FormID, std::vector<std::string>> allocation;  // vendor faction -> set ids
 		std::map<RE::FormID, std::int32_t>             stocked;     // vendor faction -> period stocked
-		std::set<std::string>                          owned;       // set ids fully owned once
+		std::set<std::string>                          owned;       // set ids fully owned once (or granted by a god)
+		std::int32_t                                   blessing{ -1 };  // god index (Gods.h), -1: none
+		std::map<std::int32_t, float>                  lastOffering;    // god -> days passed at the last accepted offering
 
 		static State& Get();
 		static void   Register();  // SKSE serialization callbacks

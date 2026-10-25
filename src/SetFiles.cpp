@@ -15,7 +15,8 @@ namespace IOD
 //   name         required, unique within this file
 //   outfit       an outfit record the mod defines (all its armour pieces are used), and/or
 //   pieces       a list of armour records
-//   sources      "Radiant Raiment", "Khajiit caravans", "Thieves Guild"
+//   sources      "Radiant Raiment", "Khajiit caravans", "Thieves Guild", and/or gods whose shrine grants
+//                it: "Dibella", "Talos", "Sanguine", ... (the Nine Divines and the Daedric princes)
 //                Radiant Raiment only trades clothing and jewellery: armour sets placed there never
 //                appear (the log and the settings page warn). The caravans and fences trade anything.
 //   rarity       "Common" (default), "Rare", "Legendary"
@@ -28,6 +29,8 @@ namespace IOD
 //                  {"type": "quest", "quest": "TG09"}        (editor ID or Plugin.esp|0x....)
 //                  {"type": "perk", "perk": "Plugin.esp|0x...."}
 //                  {"type": "blessing", "god": "Mara"}      (shrines: milestone 4)
+//   offering     optional, for shrines: [{"item": "Skyrim.esm|0xF", "count": 250}, ...]; an item can be a
+//                list of alternatives. Default: the god's offering for the set's rarity (Shrines/Shrines.json)
 //   unique       true (default): leaves rotation once you own every piece
 //   enabled      true (default)
 )";

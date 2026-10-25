@@ -154,6 +154,9 @@ jobs:
           Copy-Item $dll.FullName $plugins
           $pdb = Get-ChildItem -Recurse -Path build/release-msvc -Filter ImmersiveOutfitDistribution.pdb | Select-Object -First 1
           if ($pdb) { Copy-Item $pdb.FullName $plugins }
+          # The shrine registry ships with the mod (a subfolder: never read as a set file).
+          $shrines = New-Item -ItemType Directory -Force -Path package/SKSE/Plugins/ImmersiveOutfitDistribution/Shrines
+          Copy-Item config/Shrines.json $shrines
           # The set list is the user's own file: updates never ship one, so installing (Merge in
           # MO2) only replaces the plugin. The example stays in the repo (config/MyOutfits.json).
           Copy-Item README.md package/README-ImmersiveOutfitDistribution.md

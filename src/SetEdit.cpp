@@ -2,6 +2,7 @@
 
 #include "Catalog.h"
 #include "SetFiles.h"
+#include "Shrines.h"
 #include "Stocker.h"
 
 namespace IOD::Edit
@@ -77,6 +78,17 @@ namespace IOD::Edit
 		}
 		auto* form = LookupFormString(a_draft.reqRef);
 		return form ? form->As<RE::BGSPerk>() : nullptr;
+	}
+
+	std::string OfferingText(const Draft& a_draft, int a_god)
+	{
+		if (a_draft.original.is_object() && a_draft.original.contains("offering")) {
+			if (const auto own = ParseOffering(a_draft.original["offering"], "editor")) {
+				return DescribeOffering(*own) + " (this set's own)";
+			}
+		}
+		const auto& offering = Shrines::GetSingleton()->DefaultOffering(a_god, static_cast<Rarity>(std::clamp(a_draft.rarity, 0, 2)));
+		return offering.empty() ? std::string("no offering defined") : DescribeOffering(offering);
 	}
 
 	int MaxFactionRank(const Draft& a_draft)
@@ -259,6 +271,8 @@ namespace IOD::Edit
 			for (const auto& s : entry["sources"]) {
 				if (const auto source = s.is_string() ? ParseSource(s.get<std::string>()) : std::nullopt) {
 					a_draft.sources[static_cast<std::size_t>(*source)] = true;
+				} else if (const auto god = s.is_string() ? ParseGod(s.get<std::string>()) : std::nullopt) {
+					a_draft.gods[static_cast<std::size_t>(*god)] = true;
 				}
 			}
 		}
@@ -369,6 +383,11 @@ namespace IOD::Edit
 		for (const auto source : kAllSources) {
 			if (a_draft.sources[static_cast<std::size_t>(source)]) {
 				sources.push_back(std::string(SourceName(source)));
+			}
+		}
+		for (std::size_t god = 0; god < kGods.size(); ++god) {
+			if (a_draft.gods[god]) {
+				sources.push_back(kGods[god]);
 			}
 		}
 		entry["sources"] = sources;

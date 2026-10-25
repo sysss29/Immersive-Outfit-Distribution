@@ -38,6 +38,8 @@ Int oReqSkill = -1
 Int oReqFaction = -1
 Int oReqGod = -1
 Int oReqPerk = -1
+Int oShrine = -1
+Int oClearCooldowns = -1
 Int oReqQuest = -1
 Int oReqRef = -1
 Int oReload = -1
@@ -46,15 +48,20 @@ Int oArrival = -1
 Int oGuarantee = -1
 
 Int Function GetVersion()
-	Return 1
+	Return 2  ; 2: Shrines page
 EndFunction
 
 Event OnConfigInit()
 	ModName = "Immersive Outfit Distribution"
-	Pages = new String[3]
+	Pages = new String[4]
 	Pages[0] = "Sets"
 	Pages[1] = "Vendors"
-	Pages[2] = "Settings"
+	Pages[2] = "Shrines"
+	Pages[3] = "Settings"
+EndEvent
+
+Event OnVersionUpdate(Int aiVersion)
+	OnConfigInit()
 EndEvent
 
 Event OnConfigOpen()
@@ -95,6 +102,8 @@ Function ClearIds()
 	oReqFaction = -1
 	oReqGod = -1
 	oReqPerk = -1
+	oShrine = -1
+	oClearCooldowns = -1
 	oReqQuest = -1
 	oReqRef = -1
 	oReload = -1
@@ -108,6 +117,8 @@ Event OnPageReset(String asPage)
 	SetCursorFillMode(TOP_TO_BOTTOM)
 	If asPage == "Vendors"
 		ShowVendors()
+	ElseIf asPage == "Shrines"
+		ShowShrines()
 	ElseIf asPage == "Settings"
 		ShowSettings()
 	ElseIf selected >= 0 && selected < IOD_Native.SetNames().Length
@@ -172,6 +183,13 @@ Function ShowEditor()
 		EndIf
 		i += 1
 	EndWhile
+	Int god = IOD_Native.GetInt(s, "god")
+	If god < 0
+		AddTextOption("Several shrines", "edit in F1", OPTION_FLAG_DISABLED)
+	Else
+		String[] shrines = ListOf("shrines")
+		oShrine = AddMenuOption("Shrine", shrines[god])
+	EndIf
 	AddHeaderOption("Pieces")
 	oPieces = AddTextOption("" + IOD_Native.GetInt(s, "pieces") + " pieces", "highlight to list")
 	AddTextOption("Add or remove pieces: F1", "", OPTION_FLAG_DISABLED)
@@ -265,6 +283,30 @@ Function ShowVendors()
 	AddTextOption("only after their quests", "", OPTION_FLAG_DISABLED)
 EndFunction
 
+Function ShowShrines()
+	SetCursorPosition(0)
+	AddHeaderOption("Devotion")
+	AddTextOption("Current blessing", IOD_Native.Blessing(), OPTION_FLAG_DISABLED)
+	AddTextOption("Pray at a shrine to change it", "", OPTION_FLAG_DISABLED)
+	AddEmptyOption()
+	AddHeaderOption("Testing")
+	oClearCooldowns = AddTextOption("Clear offering cooldowns", "Clear")
+	SetCursorPosition(1)
+	AddHeaderOption("Gods with sets")
+	String[] lines = IOD_Native.ShrineLines()
+	If lines.Length == 0
+		AddTextOption("No set is granted at a shrine yet", "", OPTION_FLAG_DISABLED)
+	EndIf
+	Int i = 0
+	While i < lines.Length && i < 25
+		String[] parts = StringUtil.Split(lines[i], "|")
+		If parts.Length >= 2
+			AddTextOption(parts[0], parts[1], OPTION_FLAG_DISABLED)
+		EndIf
+		i += 1
+	EndWhile
+EndFunction
+
 Function ShowSettings()
 	SetCursorPosition(0)
 	AddHeaderOption("Vendors")
@@ -354,6 +396,10 @@ Event OnOptionSelect(Int aiOption)
 	ElseIf src >= 0
 		Report(IOD_Native.SetBool(selected, "src" + src, !IOD_Native.GetBool(selected, "src" + src)))
 		ForcePageReset()
+	ElseIf aiOption == oClearCooldowns
+		IOD_Native.ClearCooldowns()
+		ShowMessage("Every god accepts an offering again.", False)
+		ForcePageReset()
 	ElseIf aiOption == oRedraw
 		IOD_Native.Redraw()
 		ShowMessage("New stock has been drawn. Vendors show it the next time you talk to them.", False)
@@ -419,6 +465,10 @@ Event OnOptionMenuOpen(Int aiOption)
 		SetMenuDialogOptions(ListOf("skills"))
 		SetMenuDialogStartIndex(IOD_Native.GetInt(selected, "reqskill"))
 		SetMenuDialogDefaultIndex(0)
+	ElseIf aiOption == oShrine
+		SetMenuDialogOptions(ListOf("shrines"))
+		SetMenuDialogStartIndex(IOD_Native.GetInt(selected, "god"))
+		SetMenuDialogDefaultIndex(0)
 	ElseIf aiOption == oReqPerk
 		SetMenuDialogOptions(IOD_Native.PerkChoices(selected))
 		SetMenuDialogStartIndex(IOD_Native.GetInt(selected, "reqperk"))
@@ -448,6 +498,8 @@ Event OnOptionMenuAccept(Int aiOption, Int aiIndex)
 		Report(IOD_Native.SetInt(selected, "reqtype", aiIndex))
 	ElseIf aiOption == oReqSkill
 		Report(IOD_Native.SetInt(selected, "reqskill", aiIndex))
+	ElseIf aiOption == oShrine
+		Report(IOD_Native.SetInt(selected, "god", aiIndex))
 	ElseIf aiOption == oReqPerk
 		Report(IOD_Native.SetInt(selected, "reqperk", aiIndex))
 	ElseIf aiOption == oReqGod
@@ -489,6 +541,13 @@ Event OnOptionHighlight(Int aiOption)
 			SetInfoText("Sell this set here. Each vendor shows 0 to 3 sets every 48 hours.")
 		Else
 			SetInfoText(warning)
+		EndIf
+	ElseIf aiOption == oShrine
+		String offering = IOD_Native.GetText(selected, "offering")
+		If offering == ""
+			SetInfoText("Pray at this god's shrine carrying their offering to receive the set.")
+		Else
+			SetInfoText(offering)
 		EndIf
 	ElseIf aiOption == oPieces
 		SetInfoText(IOD_Native.GetText(selected, "pieces"))

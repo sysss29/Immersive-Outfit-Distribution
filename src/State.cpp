@@ -6,7 +6,7 @@ namespace IOD
 	{
 		constexpr std::uint32_t kUniqueID = 'IOD1';
 		constexpr std::uint32_t kRecord = 'IODS';
-		constexpr std::uint32_t kVersion = 1;
+		constexpr std::uint32_t kVersion = 2;  // 2: + blessing, offering cooldowns
 
 		template <class T>
 		bool Write(SKSE::SerializationInterface* a_intfc, const T& a_value)
@@ -65,6 +65,10 @@ namespace IOD
 			for (const auto& id : s.owned) {
 				ok = ok && WriteString(a_intfc, id);
 			}
+			ok = ok && Write(a_intfc, s.blessing) && Write(a_intfc, static_cast<std::uint32_t>(s.lastOffering.size()));
+			for (const auto& [god, day] : s.lastOffering) {
+				ok = ok && Write(a_intfc, god) && Write(a_intfc, day);
+			}
 			if (!ok) {
 				spdlog::error("Failed to write save data");
 			}
@@ -78,7 +82,7 @@ namespace IOD
 			std::uint32_t version = 0;
 			std::uint32_t length = 0;
 			while (a_intfc->GetNextRecordInfo(type, version, length)) {
-				if (type != kRecord || version != kVersion) {
+				if (type != kRecord || version < 1 || version > kVersion) {
 					continue;
 				}
 				bool ok = Read(a_intfc, s.salt) && Read(a_intfc, s.allocPeriod);
@@ -117,12 +121,23 @@ namespace IOD
 						s.owned.insert(std::move(id));
 					}
 				}
+				if (version >= 2) {
+					ok = ok && Read(a_intfc, s.blessing) && Read(a_intfc, count);
+					for (std::uint32_t i = 0; ok && i < count; ++i) {
+						std::int32_t god = 0;
+						float        day = 0.0f;
+						ok = Read(a_intfc, god) && Read(a_intfc, day);
+						if (ok) {
+							s.lastOffering[god] = day;
+						}
+					}
+				}
 				if (!ok) {
 					spdlog::error("Save data was incomplete; starting fresh");
 					s.Reset();
 				}
 			}
-			spdlog::info("Loaded: period {}, {} vendor(s) allocated, {} set(s) owned", s.allocPeriod, s.allocation.size(), s.owned.size());
+			spdlog::info("Loaded: period {}, {} vendor(s) allocated, {} set(s) owned, blessing {}", s.allocPeriod, s.allocation.size(), s.owned.size(), s.blessing);
 		}
 
 		void OnRevert(SKSE::SerializationInterface*)
@@ -144,6 +159,8 @@ namespace IOD
 		allocation.clear();
 		stocked.clear();
 		owned.clear();
+		blessing = -1;
+		lastOffering.clear();
 	}
 
 	void State::Register()

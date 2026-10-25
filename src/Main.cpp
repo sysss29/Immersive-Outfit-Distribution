@@ -3,6 +3,7 @@
 #include "SetEdit.h"
 #include "SetFiles.h"
 #include "Settings.h"
+#include "Shrines.h"
 #include "Sources.h"
 #include "State.h"
 #include "Stocker.h"
@@ -36,6 +37,8 @@ namespace
 			IOD::Catalog::GetSingleton().Load();
 			IOD::Stocker::CheckTradeable();
 			IOD::Stocker::Install();
+			IOD::Shrines::GetSingleton()->Load();
+			IOD::Shrines::GetSingleton()->Install();
 			{
 				std::scoped_lock lock(IOD::Edit::Lock());
 				IOD::SetFiles::Get().Load();
@@ -52,7 +55,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 {
 	SKSE::Init(a_skse);
 	InitLogging();
-	spdlog::info("Immersive Outfit Distribution 0.3.3 on Skyrim {}", REL::Module::get().version().string());
+	spdlog::info("Immersive Outfit Distribution 0.4.0 on Skyrim {}", REL::Module::get().version().string());
 
 	IOD::State::Register();
 	IOD::Papyrus::Install();

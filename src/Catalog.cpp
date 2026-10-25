@@ -1,5 +1,7 @@
 #include "Catalog.h"
 
+#include "Gods.h"
+
 namespace IOD
 {
 	namespace
@@ -83,6 +85,48 @@ namespace IOD
 		}
 		const auto local = file->IsLight() ? (a_form->GetFormID() & 0xFFF) : (a_form->GetFormID() & 0xFFFFFF);
 		return fmt::format("{}|0x{:X}", file->GetFilename(), local);
+	}
+
+	std::optional<Offering> ParseOffering(const nlohmann::json& a_json, std::string_view a_context)
+	{
+		if (!a_json.is_array()) {
+			return std::nullopt;
+		}
+		Offering offering;
+		for (const auto& line : a_json) {
+			OfferingItem item;
+			item.count = std::max(1, line.value("count", 1));
+			const auto refs = line.contains("item") ? line["item"] : nlohmann::json{};
+			for (const auto& ref : refs.is_array() ? refs : nlohmann::json::array({ refs })) {
+				auto* form = ref.is_string() ? LookupFormString(ref.get<std::string>()) : nullptr;
+				if (auto* object = form ? form->As<RE::TESBoundObject>() : nullptr) {
+					item.any.push_back(object);
+				} else {
+					spdlog::warn("{}: offering item {} not found", a_context, ref.dump());
+				}
+			}
+			if (item.any.empty()) {
+				return std::nullopt;  // an offering that can't be made is no offering
+			}
+			offering.push_back(std::move(item));
+		}
+		return offering.empty() ? std::nullopt : std::optional{ std::move(offering) };
+	}
+
+	std::string DescribeOffering(const Offering& a_offering)
+	{
+		std::string text;
+		for (const auto& item : a_offering) {
+			auto*       first = item.any.front();
+			const bool  gold = first->GetFormID() == 0xF;
+			std::string name = gold ? "gold" : first->GetName();
+			if (item.any.size() > 1 && !gold) {
+				name += " (or similar)";
+			}
+			const auto line = item.count > 1 || gold ? fmt::format("{} {}", item.count, name) : name;
+			text += (text.empty() ? "" : ", ") + line;
+		}
+		return text;
 	}
 
 	bool OutfitSet::HasSource(Source a_source) const
@@ -208,12 +252,23 @@ namespace IOD
 						if (!set.HasSource(*parsed)) {
 							set.sources.push_back(*parsed);
 						}
+					} else if (const auto god = ParseGod(text)) {
+						if (!set.HasGod(*god)) {
+							set.gods.push_back(*god);
+						}
 					} else {
 						spdlog::info("{}: source \"{}\" not supported yet, ignored", context, text);
 					}
 				}
 			}
-			if (set.sources.empty()) {
+			if (entry.contains("offering")) {
+				if (auto offering = ParseOffering(entry["offering"], context)) {
+					set.offering = std::move(*offering);
+				} else {
+					spdlog::warn("{}: offering can't be used; the god's default applies", context);
+				}
+			}
+			if (set.sources.empty() && set.gods.empty()) {
 				spdlog::info("{}: no usable source, not distributed", context);
 				continue;
 			}
@@ -239,7 +294,7 @@ namespace IOD
 			}
 			set.unique = entry.value("unique", true);
 
-			spdlog::info("{}: {} piece(s), {} source(s)", context, set.pieces.size(), set.sources.size());
+			spdlog::info("{}: {} piece(s), {} vendor source(s), {} shrine(s)", context, set.pieces.size(), set.sources.size(), set.gods.size());
 			_sets.push_back(std::move(set));
 		}
 	}

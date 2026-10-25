@@ -4,6 +4,8 @@
 #include "SetEdit.h"
 #include "SetFiles.h"
 #include "Settings.h"
+#include "Shrines.h"
+#include "State.h"
 #include "Sources.h"
 #include "Stocker.h"
 
@@ -74,6 +76,11 @@ namespace IOD::Papyrus
 						sold = true;
 						if (TradeCount(resolved.pieces, *source).first == 0) {
 							return fmt::format("never at {}", SourceName(*source));
+						}
+					} else if (const auto god = s.is_string() ? ParseGod(s.get<std::string>()) : std::nullopt) {
+						sold = true;
+						if (!Shrines::GetSingleton()->HasShrine(*god)) {
+							return fmt::format("no shrine of {}", GodName(*god));
 						}
 					}
 				}
@@ -237,6 +244,17 @@ namespace IOD::Papyrus
 			if (field == "reqfaction") {
 				return d.reqFaction;
 			}
+			if (field == "god") {  // the shrine granting it: 0 none, 1.. = god + 1; -1: several (edit in F1)
+				int count = 0;
+				int first = -1;
+				for (int g = 0; g < static_cast<int>(kGods.size()); ++g) {
+					if (d.gods[static_cast<std::size_t>(g)]) {
+						first = first < 0 ? g : first;
+						++count;
+					}
+				}
+				return count == 0 ? 0 : count == 1 ? first + 1 : -1;
+			}
 			if (field == "reqperk") {  // index in PerkChoices; the last entry means "other"
 				return d.reqPerk < 0 ? static_cast<std::int32_t>(PerksOfTree(d.reqSkill).size()) : d.reqPerk;
 			}
@@ -286,6 +304,11 @@ namespace IOD::Papyrus
 					d.reqPerk = 0;  // a different tree: start at its first perk
 				}
 				d.reqSkill = std::clamp(a_value, 0, static_cast<int>(kSkills.size()) - 1);
+			} else if (field == "god") {
+				d.gods = {};
+				if (a_value >= 1 && a_value <= static_cast<int>(kGods.size())) {
+					d.gods[static_cast<std::size_t>(a_value - 1)] = true;
+				}
 			} else if (field == "reqperk") {
 				const auto count = static_cast<int>(PerksOfTree(d.reqSkill).size());
 				d.reqPerk = a_value >= count ? -1 : std::max(0, a_value);
@@ -343,6 +366,14 @@ namespace IOD::Papyrus
 				}
 				return Safe(text);
 			}
+			if (field == "offering") {  // what the set's (first) shrine asks
+				for (int g = 0; g < static_cast<int>(kGods.size()); ++g) {
+					if (d.gods[static_cast<std::size_t>(g)]) {
+						return Safe(fmt::format("{} asks: {}", GodName(g), OfferingText(d, g)));
+					}
+				}
+				return "";
+			}
 			if (field == "file") {
 				return Safe(SetFiles::Get().Files()[d.file].stem + ".json");
 			}
@@ -382,6 +413,12 @@ namespace IOD::Papyrus
 				for (const auto* s : kSkills) {
 					out.emplace_back(s);
 				}
+			} else if (list == "shrines") {
+				out.emplace_back("No shrine");
+				for (int g = 0; g < static_cast<int>(kGods.size()); ++g) {
+					const bool has = Shrines::GetSingleton()->HasShrine(g);
+					out.emplace_back(has ? std::string(kGods[static_cast<std::size_t>(g)]) : fmt::format("{} (no shrine)", kGods[static_cast<std::size_t>(g)]));
+				}
 			} else if (list == "gods") {
 				for (const auto* g : kGods) {
 					out.emplace_back(g);
@@ -413,6 +450,50 @@ namespace IOD::Papyrus
 			return out;
 		}
 
+		// --- shrines --------------------------------------------------------------------------
+
+		String Blessing(Tag*)
+		{
+			const auto god = State::Get().blessing;
+			return god < 0 ? "none" : GodName(god);
+		}
+
+		// One line per god that grants sets or is on cooldown: "Dibella|2 sets, ready"
+		std::vector<String> ShrineLines(Tag*)
+		{
+			std::vector<String> out;
+			auto&               state = State::Get();
+			for (int g = 0; g < static_cast<int>(kGods.size()); ++g) {
+				int total = 0;
+				int left = 0;
+				for (const auto& set : Catalog::GetSingleton().Sets()) {
+					if (set.HasGod(g)) {
+						++total;
+						left += state.owned.contains(set.id) ? 0 : 1;
+					}
+				}
+				const auto wait = Shrines::GetSingleton()->CooldownDaysLeft(g);
+				if (total == 0 && wait <= 0.0f) {
+					continue;
+				}
+				std::string status = fmt::format("{} of {} set(s) left", left, total);
+				status += wait > 0.0f ? fmt::format(", next offering in {} day(s)", static_cast<int>(std::ceil(wait))) : ", ready";
+				if (!Shrines::GetSingleton()->HasShrine(g)) {
+					status += ", no shrine";
+				}
+				out.emplace_back(Safe(fmt::format("{}|{}", GodName(g), status)));
+			}
+			return out;
+		}
+
+		void ClearCooldowns(Tag*)
+		{
+			SKSE::GetTaskInterface()->AddTask([]() {
+				State::Get().lastOffering.clear();
+				spdlog::info("Shrine cooldowns cleared on request");
+			});
+		}
+
 		void ReloadFiles(Tag*)
 		{
 			std::scoped_lock lock(Lock());
@@ -439,6 +520,9 @@ namespace IOD::Papyrus
 			a_vm->RegisterFunction("Choices", kScript, Choices);
 			a_vm->RegisterFunction("ReloadFiles", kScript, ReloadFiles);
 			a_vm->RegisterFunction("PerkChoices", kScript, PerkChoices);
+			a_vm->RegisterFunction("Blessing", kScript, Blessing);
+			a_vm->RegisterFunction("ShrineLines", kScript, ShrineLines);
+			a_vm->RegisterFunction("ClearCooldowns", kScript, ClearCooldowns);
 			spdlog::info("Papyrus functions registered for the MCM");
 			return true;
 		}

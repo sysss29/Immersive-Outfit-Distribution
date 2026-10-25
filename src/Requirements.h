@@ -13,7 +13,7 @@ namespace IOD
 			kSkill,      // base skill level >= value
 			kFaction,    // rank in faction >= value
 			kQuest,      // quest completed
-			kBlessing,   // current blessing (milestone 4; never met before then)
+			kBlessing,   // current blessing is this god (value = god index)
 			kPerk,       // the player has this perk
 			kInvalid,    // couldn't be read (e.g. quest not found): never met, so the set stays hidden
 		};

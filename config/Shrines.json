@@ -1,0 +1,972 @@
+{
+  "_about": "Shrine registry and offerings of Immersive Outfit Distribution. Shipped with the mod (updates replace it). shrines: which shrine or statue records belong to which god (vanilla Skyrim.esm and Daedric Shrines - All in One). gods: the offering each god asks for a set of each rarity (a set can override it with its own 'offering'), and the line the god says when accepting. An item can list alternatives: any mix of them counts.",
+  "cooldownDays": 7,
+  "statueReach": 700,
+  "gods": {
+    "Akatosh": {
+      "offerings": {
+        "Common": [
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 100
+          }
+        ],
+        "Rare": [
+          {
+            "item": "Skyrim.esm|0x3ADA3",
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 250
+          }
+        ],
+        "Legendary": [
+          {
+            "item": "Skyrim.esm|0x3ADA4",
+            "count": 2
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 500
+          }
+        ]
+      },
+      "accept": "Time bends, and a gift is laid before you."
+    },
+    "Arkay": {
+      "offerings": {
+        "Common": [
+          {
+            "item": "Skyrim.esm|0x34CDD",
+            "count": 2
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 100
+          }
+        ],
+        "Rare": [
+          {
+            "item": "Skyrim.esm|0x3AD63",
+            "count": 2
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 250
+          }
+        ],
+        "Legendary": [
+          {
+            "item": "Skyrim.esm|0x6851E",
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 500
+          }
+        ]
+      },
+      "accept": "Arkay accepts your devotion."
+    },
+    "Dibella": {
+      "offerings": {
+        "Common": [
+          {
+            "item": "Skyrim.esm|0x63B45",
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 100
+          }
+        ],
+        "Rare": [
+          {
+            "item": "Skyrim.esm|0x68521",
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 250
+          }
+        ],
+        "Legendary": [
+          {
+            "item": "Skyrim.esm|0x6851F",
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 500
+          }
+        ]
+      },
+      "accept": "Beauty answers beauty. Dibella is pleased."
+    },
+    "Julianos": {
+      "offerings": {
+        "Common": [
+          {
+            "item": [
+              "Skyrim.esm|0x2E4E2",
+              "Skyrim.esm|0x2E4E3"
+            ],
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 100
+          }
+        ],
+        "Rare": [
+          {
+            "item": [
+              "Skyrim.esm|0x2E4F4",
+              "Skyrim.esm|0x2E4FB"
+            ],
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 250
+          }
+        ],
+        "Legendary": [
+          {
+            "item": [
+              "Skyrim.esm|0x2E4FC",
+              "Skyrim.esm|0x2E4FF"
+            ],
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0x68523",
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 500
+          }
+        ]
+      },
+      "accept": "Wisdom is rewarded."
+    },
+    "Kynareth": {
+      "offerings": {
+        "Common": [
+          {
+            "item": "Skyrim.esm|0x45C28",
+            "count": 3
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 50
+          }
+        ],
+        "Rare": [
+          {
+            "item": "Skyrim.esm|0xE7ED0",
+            "count": 3
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 250
+          }
+        ],
+        "Legendary": [
+          {
+            "item": "Skyrim.esm|0x68520",
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 500
+          }
+        ]
+      },
+      "accept": "The wind carries Kynareth's gift to you."
+    },
+    "Mara": {
+      "offerings": {
+        "Common": [
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 100
+          }
+        ],
+        "Rare": [
+          {
+            "item": "Skyrim.esm|0x5ACE3",
+            "count": 2
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 250
+          }
+        ],
+        "Legendary": [
+          {
+            "item": "Skyrim.esm|0x68522",
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 500
+          }
+        ]
+      },
+      "accept": "Mara's love surrounds you."
+    },
+    "Stendarr": {
+      "offerings": {
+        "Common": [
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 100
+          }
+        ],
+        "Rare": [
+          {
+            "item": "Skyrim.esm|0x5ACE5",
+            "count": 3
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 250
+          }
+        ],
+        "Legendary": [
+          {
+            "item": "Skyrim.esm|0x5ACE5",
+            "count": 5
+          },
+          {
+            "item": "Skyrim.esm|0x6851F",
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 500
+          }
+        ]
+      },
+      "accept": "Stendarr grants you his protection."
+    },
+    "Talos": {
+      "offerings": {
+        "Common": [
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 100
+          }
+        ],
+        "Rare": [
+          {
+            "item": "Skyrim.esm|0x13989",
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 250
+          }
+        ],
+        "Legendary": [
+          {
+            "item": "Skyrim.esm|0x3ADA4",
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 500
+          }
+        ]
+      },
+      "accept": "Talos honours the strong."
+    },
+    "Zenithar": {
+      "offerings": {
+        "Common": [
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 200
+          }
+        ],
+        "Rare": [
+          {
+            "item": "Skyrim.esm|0x5AD9E",
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 400
+          }
+        ],
+        "Legendary": [
+          {
+            "item": "Skyrim.esm|0x5AD9E",
+            "count": 3
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 1000
+          }
+        ]
+      },
+      "accept": "A fair trade, says Zenithar."
+    },
+    "Azura": {
+      "offerings": {
+        "Common": [
+          {
+            "item": "Skyrim.esm|0xD8E3F",
+            "count": 2
+          }
+        ],
+        "Rare": [
+          {
+            "item": "Skyrim.esm|0x3AD73",
+            "count": 2
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 250
+          }
+        ],
+        "Legendary": [
+          {
+            "item": "Skyrim.esm|0x68523",
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0xD8E3F",
+            "count": 3
+          }
+        ]
+      },
+      "accept": "Azura smiles from the twilight."
+    },
+    "Boethiah": {
+      "offerings": {
+        "Common": [
+          {
+            "item": "Skyrim.esm|0x2F44C",
+            "count": 2
+          }
+        ],
+        "Rare": [
+          {
+            "item": "Skyrim.esm|0x5AD9D",
+            "count": 1
+          }
+        ],
+        "Legendary": [
+          {
+            "item": "Skyrim.esm|0x3AD5B",
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0x5AD9D",
+            "count": 2
+          }
+        ]
+      },
+      "accept": "Boethiah approves of your ambition."
+    },
+    "Clavicus Vile": {
+      "offerings": {
+        "Common": [
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 300
+          }
+        ],
+        "Rare": [
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 600
+          }
+        ],
+        "Legendary": [
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 1500
+          }
+        ]
+      },
+      "accept": "A bargain! Clavicus Vile always enjoys a bargain."
+    },
+    "Hermaeus Mora": {
+      "offerings": {
+        "Common": [
+          {
+            "item": "Skyrim.esm|0x3AD60",
+            "count": 1
+          }
+        ],
+        "Rare": [
+          {
+            "item": [
+              "Skyrim.esm|0x2E500",
+              "Skyrim.esm|0x2E504"
+            ],
+            "count": 1
+          }
+        ],
+        "Legendary": [
+          {
+            "item": [
+              "Skyrim.esm|0x2E500",
+              "Skyrim.esm|0x2E504"
+            ],
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0x3AD5B",
+            "count": 1
+          }
+        ]
+      },
+      "accept": "Knowledge has its price, and you have paid it."
+    },
+    "Hircine": {
+      "offerings": {
+        "Common": [
+          {
+            "item": "Skyrim.esm|0x3AD74",
+            "count": 2
+          }
+        ],
+        "Rare": [
+          {
+            "item": "Skyrim.esm|0x3AD53",
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0x6BC04",
+            "count": 2
+          }
+        ],
+        "Legendary": [
+          {
+            "item": "Skyrim.esm|0x3AD72",
+            "count": 3
+          },
+          {
+            "item": "Skyrim.esm|0x3AD53",
+            "count": 2
+          }
+        ]
+      },
+      "accept": "The hunt honours you."
+    },
+    "Malacath": {
+      "offerings": {
+        "Common": [
+          {
+            "item": "Skyrim.esm|0x5ACE4",
+            "count": 3
+          }
+        ],
+        "Rare": [
+          {
+            "item": "Skyrim.esm|0x3AD72",
+            "count": 2
+          }
+        ],
+        "Legendary": [
+          {
+            "item": "Skyrim.esm|0x5AD9D",
+            "count": 2
+          },
+          {
+            "item": "Skyrim.esm|0x3AD5B",
+            "count": 1
+          }
+        ]
+      },
+      "accept": "Malacath accepts. Wear this with pride."
+    },
+    "Mehrunes Dagon": {
+      "offerings": {
+        "Common": [
+          {
+            "item": "Skyrim.esm|0x3AD5E",
+            "count": 1
+          }
+        ],
+        "Rare": [
+          {
+            "item": "Skyrim.esm|0x3AD5E",
+            "count": 3
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 250
+          }
+        ],
+        "Legendary": [
+          {
+            "item": "Skyrim.esm|0x3AD5B",
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0x3AD5E",
+            "count": 3
+          }
+        ]
+      },
+      "accept": "Dagon is amused. Take this."
+    },
+    "Mephala": {
+      "offerings": {
+        "Common": [
+          {
+            "item": "Skyrim.esm|0x9151B",
+            "count": 2
+          }
+        ],
+        "Rare": [
+          {
+            "item": "Skyrim.esm|0x2F44C",
+            "count": 3
+          },
+          {
+            "item": "Skyrim.esm|0x516C8",
+            "count": 1
+          }
+        ],
+        "Legendary": [
+          {
+            "item": "Skyrim.esm|0x68520",
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0x9151B",
+            "count": 5
+          }
+        ]
+      },
+      "accept": "Mephala weaves you a gift."
+    },
+    "Meridia": {
+      "offerings": {
+        "Common": [
+          {
+            "item": "Skyrim.esm|0x3AD73",
+            "count": 1
+          }
+        ],
+        "Rare": [
+          {
+            "item": "Skyrim.esm|0x3AD73",
+            "count": 2
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 250
+          }
+        ],
+        "Legendary": [
+          {
+            "item": "Skyrim.esm|0x6851F",
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0x3AD73",
+            "count": 3
+          }
+        ]
+      },
+      "accept": "Meridia's light shines upon you."
+    },
+    "Molag Bal": {
+      "offerings": {
+        "Common": [
+          {
+            "item": "Skyrim.esm|0x5ACE4",
+            "count": 2
+          }
+        ],
+        "Rare": [
+          {
+            "item": [
+              "Skyrim.esm|0x2E500",
+              "Skyrim.esm|0x2E504"
+            ],
+            "count": 1
+          }
+        ],
+        "Legendary": [
+          {
+            "item": "Skyrim.esm|0xB18CD",
+            "count": 1
+          },
+          {
+            "item": [
+              "Skyrim.esm|0x2E500",
+              "Skyrim.esm|0x2E504"
+            ],
+            "count": 1
+          }
+        ]
+      },
+      "accept": "Molag Bal takes. And, this once, gives."
+    },
+    "Namira": {
+      "offerings": {
+        "Common": [
+          {
+            "item": "Skyrim.esm|0x1016B3",
+            "count": 1
+          }
+        ],
+        "Rare": [
+          {
+            "item": "Skyrim.esm|0x1016B3",
+            "count": 3
+          }
+        ],
+        "Legendary": [
+          {
+            "item": "Skyrim.esm|0xB18CD",
+            "count": 2
+          }
+        ]
+      },
+      "accept": "Namira savours your offering."
+    },
+    "Nocturnal": {
+      "offerings": {
+        "Common": [
+          {
+            "item": "Skyrim.esm|0x2F44C",
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 50
+          }
+        ],
+        "Rare": [
+          {
+            "item": "Skyrim.esm|0x516C8",
+            "count": 2
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 250
+          }
+        ],
+        "Legendary": [
+          {
+            "item": "Skyrim.esm|0x68523",
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 500
+          }
+        ]
+      },
+      "accept": "Nocturnal grants you her shadow."
+    },
+    "Peryite": {
+      "offerings": {
+        "Common": [
+          {
+            "item": "Skyrim.esm|0x516C8",
+            "count": 2
+          }
+        ],
+        "Rare": [
+          {
+            "item": "Skyrim.esm|0x3AD76",
+            "count": 2
+          }
+        ],
+        "Legendary": [
+          {
+            "item": "Skyrim.esm|0x3AD5B",
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0x3AD60",
+            "count": 2
+          }
+        ]
+      },
+      "accept": "Peryite accepts."
+    },
+    "Sanguine": {
+      "offerings": {
+        "Common": [
+          {
+            "item": [
+              "Skyrim.esm|0x3133C",
+              "Skyrim.esm|0xC5348"
+            ],
+            "count": 3
+          },
+          {
+            "item": "Skyrim.esm|0x34C5D",
+            "count": 1
+          }
+        ],
+        "Rare": [
+          {
+            "item": "Skyrim.esm|0xF693F",
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0x57A7A",
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0x64B3D",
+            "count": 1
+          }
+        ],
+        "Legendary": [
+          {
+            "item": "Skyrim.esm|0xF693F",
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0x57A7A",
+            "count": 2
+          },
+          {
+            "item": [
+              "Skyrim.esm|0x68521",
+              "Skyrim.esm|0x6851F",
+              "Skyrim.esm|0x68523",
+              "Skyrim.esm|0x68520",
+              "Skyrim.esm|0x68522",
+              "Skyrim.esm|0x6851E"
+            ],
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0xF",
+            "count": 500
+          }
+        ]
+      },
+      "accept": "Sanguine raises a cup to you. Enjoy!"
+    },
+    "Sheogorath": {
+      "offerings": {
+        "Common": [
+          {
+            "item": "Skyrim.esm|0x64B3D",
+            "count": 2
+          }
+        ],
+        "Rare": [
+          {
+            "item": "Skyrim.esm|0x57A7A",
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0x45C28",
+            "count": 3
+          }
+        ],
+        "Legendary": [
+          {
+            "item": "Skyrim.esm|0x6851E",
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0x64B3D",
+            "count": 5
+          }
+        ]
+      },
+      "accept": "Cheese for everyone! Well, clothes for you."
+    },
+    "Vaermina": {
+      "offerings": {
+        "Common": [
+          {
+            "item": "Skyrim.esm|0x516C8",
+            "count": 1
+          }
+        ],
+        "Rare": [
+          {
+            "item": "Skyrim.esm|0x57A7A",
+            "count": 2
+          }
+        ],
+        "Legendary": [
+          {
+            "item": [
+              "Skyrim.esm|0x2E500",
+              "Skyrim.esm|0x2E504"
+            ],
+            "count": 1
+          },
+          {
+            "item": "Skyrim.esm|0x6851E",
+            "count": 1
+          }
+        ]
+      },
+      "accept": "Vaermina sends you a dream made real."
+    }
+  },
+  "shrines": [
+    {
+      "god": "Akatosh",
+      "forms": [
+        "Skyrim.esm|0xD9883"
+      ]
+    },
+    {
+      "god": "Arkay",
+      "forms": [
+        "Skyrim.esm|0x71854"
+      ]
+    },
+    {
+      "god": "Dibella",
+      "forms": [
+        "Skyrim.esm|0xD9881"
+      ]
+    },
+    {
+      "god": "Julianos",
+      "forms": [
+        "Skyrim.esm|0xD9885"
+      ]
+    },
+    {
+      "god": "Kynareth",
+      "forms": [
+        "Skyrim.esm|0xD987F"
+      ]
+    },
+    {
+      "god": "Mara",
+      "forms": [
+        "Skyrim.esm|0xD9887"
+      ]
+    },
+    {
+      "god": "Stendarr",
+      "forms": [
+        "Skyrim.esm|0xD987D"
+      ]
+    },
+    {
+      "god": "Talos",
+      "forms": [
+        "Skyrim.esm|0x100780"
+      ]
+    },
+    {
+      "god": "Zenithar",
+      "forms": [
+        "Skyrim.esm|0xD987B"
+      ]
+    },
+    {
+      "god": "Azura",
+      "forms": [
+        "Skyrim.esm|0x33DCA",
+        "man_DaedricShrines.esp|0x82C"
+      ]
+    },
+    {
+      "god": "Boethiah",
+      "forms": [
+        "Skyrim.esm|0x33DCC"
+      ]
+    },
+    {
+      "god": "Malacath",
+      "forms": [
+        "Skyrim.esm|0x8ADCA"
+      ]
+    },
+    {
+      "god": "Hircine",
+      "forms": [
+        "Skyrim.esm|0x950C5",
+        "man_DaedricShrines.esp|0xD61"
+      ]
+    },
+    {
+      "god": "Mehrunes Dagon",
+      "forms": [
+        "Skyrim.esm|0xC5999"
+      ]
+    },
+    {
+      "god": "Nocturnal",
+      "forms": [
+        "Skyrim.esm|0xFFF4E",
+        "Skyrim.esm|0x10E8B0",
+        "man_DaedricShrines.esp|0x5A96",
+        "man_DaedricShrines.esp|0x5A98"
+      ]
+    },
+    {
+      "god": "Meridia",
+      "forms": [
+        "Skyrim.esm|0x4E4D5"
+      ]
+    },
+    {
+      "god": "Sanguine",
+      "forms": [
+        "man_DaedricShrines.esp|0x852"
+      ]
+    },
+    {
+      "god": "Hermaeus Mora",
+      "forms": [
+        "man_DaedricShrines.esp|0x864",
+        "man_DaedricShrines.esp|0x875"
+      ]
+    },
+    {
+      "god": "Mephala",
+      "forms": [
+        "man_DaedricShrines.esp|0x87A"
+      ]
+    },
+    {
+      "god": "Sheogorath",
+      "forms": [
+        "man_DaedricShrines.esp|0x89B"
+      ]
+    },
+    {
+      "god": "Vaermina",
+      "forms": [
+        "man_DaedricShrines.esp|0x8E9"
+      ]
+    },
+    {
+      "god": "Molag Bal",
+      "forms": [
+        "man_DaedricShrines.esp|0x8F2"
+      ]
+    },
+    {
+      "god": "Peryite",
+      "forms": [
+        "man_DaedricShrines.esp|0xD62"
+      ]
+    },
+    {
+      "god": "Namira",
+      "forms": [
+        "man_DaedricShrines.esp|0xDF4"
+      ]
+    }
+  ]
+}
