@@ -6,7 +6,7 @@ sold as full sets by vendors who fit their style, on a 48-hour rotation, instead
 
 Personal project for Skyrim SE **1.7.104** (SKSE 2.3.1). No support is offered.
 
-## Status: milestone 2
+## Status: milestone 2 (+ MCM)
 
 - Full sets stocked at **Radiant Raiment** (Endarie and Taarie, Solitude), **Khajiit caravans**
   and **Thieves Guild** fences.
@@ -28,7 +28,12 @@ Personal project for Skyrim SE **1.7.104** (SKSE 2.3.1). No support is offered.
 
 ## Configuring sets
 
-In game: press F1 (SKSE Menu Framework) and open **Immersive Outfit Distribution**:
+In the Mod Configuration Menu (SkyUI), **Immersive Outfit Distribution**: every set's switches
+(enabled, where it's sold, rarity, price, requirement), this period's vendor stock with
+**Redraw now**, and the settings. Needs `ImmersiveOutfitDistribution.esp` enabled (ESL-flagged, so
+it takes no load-order slot).
+
+To build new sets, press F1 (SKSE Menu Framework) and open **Immersive Outfit Distribution**:
 
 - **Sets**: every set, with where it's sold and warnings (e.g. armour placed at Radiant Raiment);
   click one to edit sources, rarity, price, requirement and pieces. Saving applies at once.

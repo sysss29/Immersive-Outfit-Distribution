@@ -1,0 +1,15 @@
+diff --git a/Caprica/papyrus/PapyrusFunction.cpp b/Caprica/papyrus/PapyrusFunction.cpp
+index 599c69b..3ae3dd3 100644
+--- a/Caprica/papyrus/PapyrusFunction.cpp
++++ b/Caprica/papyrus/PapyrusFunction.cpp
+@@ -90,7 +90,9 @@ void PapyrusFunction::semantic(PapyrusResolutionContext* ctx) {
+ void PapyrusFunction::semantic2(PapyrusResolutionContext* ctx) {
+   if (isGlobal() && ctx->state && ctx->state->name != "")
+     ctx->reportingContext.error(location, "Global functions are only allowed in the empty state.");
+-  if (isNative() && !ctx->object->isNative())
++  // Skyrim's own compiler allows (global) Native functions in scripts not marked Native;
++  // SKSE plugins rely on this for their native-function declaration scripts.
++  if (isNative() && !ctx->object->isNative() && conf::Papyrus::game != GameID::Skyrim)
+     ctx->reportingContext.error(location, "You can only define Native functions in a script marked Native.");
+ 
+   ctx->ensureNamesAreUnique(parameters, "parameter");

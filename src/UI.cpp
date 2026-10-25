@@ -1,6 +1,7 @@
 #include "UI.h"
 
 #include "Catalog.h"
+#include "SetEdit.h"
 #include "SetFiles.h"
 #include "Settings.h"
 #include "Sources.h"
@@ -19,109 +20,14 @@ namespace IOD::UI
 	namespace
 	{
 		namespace ImGui = ImGuiMCP;
+		using namespace IOD::Edit;
+
+		Draft g_draft;  // the set open in the editor
 
 		constexpr ImGui::ImVec4 kWarn{ 1.0f, 0.62f, 0.25f, 1.0f };
 		constexpr ImGui::ImVec4 kBad{ 1.0f, 0.38f, 0.38f, 1.0f };
 		constexpr ImGui::ImVec4 kGood{ 0.55f, 0.85f, 0.55f, 1.0f };
 		constexpr ImGui::ImVec4 kDim{ 0.62f, 0.62f, 0.62f, 1.0f };
-
-		// --- reference data ---------------------------------------------------------------
-
-		constexpr std::array kRarities{ "Common", "Rare", "Legendary" };
-
-		constexpr std::array kRequirementTypes{ "None", "Character level", "Base Health", "Base Magicka", "Base Stamina",
-			"Skill level", "Faction rank", "Quest completed", "Blessing (milestone 4)" };
-		enum Req : int
-		{
-			kReqNone,
-			kReqLevel,
-			kReqHealth,
-			kReqMagicka,
-			kReqStamina,
-			kReqSkill,
-			kReqFaction,
-			kReqQuest,
-			kReqBlessing
-		};
-		constexpr std::array kReqJsonTypes{ "", "level", "health", "magicka", "stamina", "skill", "faction", "quest", "blessing" };
-
-		constexpr std::array kSkills{ "One-Handed", "Two-Handed", "Archery", "Block", "Smithing", "Heavy Armor", "Light Armor",
-			"Pickpocket", "Lockpicking", "Sneak", "Alchemy", "Speech", "Alteration", "Conjuration", "Destruction", "Illusion",
-			"Restoration", "Enchanting" };
-
-		struct KnownFaction
-		{
-			const char* label;
-			const char* ref;
-		};
-		constexpr std::array kFactions{
-			KnownFaction{ "Thieves Guild", "Skyrim.esm|0x29DA9" },
-			KnownFaction{ "Companions", "Skyrim.esm|0x48362" },
-			KnownFaction{ "College of Winterhold", "Skyrim.esm|0x1F259" },
-			KnownFaction{ "Dark Brotherhood", "Skyrim.esm|0x1BDB3" },
-			KnownFaction{ "Imperial Legion", "Skyrim.esm|0x2BF9A" },
-			KnownFaction{ "Stormcloaks", "Skyrim.esm|0x2BF9B" },
-			KnownFaction{ "Dawnguard", "Dawnguard.esm|0x14217" },
-			KnownFaction{ "Vampires (Volkihar)", "Dawnguard.esm|0x3376" },
-			KnownFaction{ "Other (enter form ID)", "" },
-		};
-		constexpr int kFactionOther = static_cast<int>(kFactions.size()) - 1;
-
-		std::string Normalise(std::string_view a_text)
-		{
-			std::string out;
-			for (char c : a_text) {
-				if (std::isalnum(static_cast<unsigned char>(c))) {
-					out.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
-				}
-			}
-			return out;
-		}
-
-		bool Contains(std::string_view a_haystack, std::string_view a_needle)
-		{
-			if (a_needle.empty()) {
-				return true;
-			}
-			const auto lower = [](std::string_view a_s) {
-				std::string out(a_s);
-				std::ranges::transform(out, out.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-				return out;
-			};
-			return lower(a_haystack).find(lower(a_needle)) != std::string::npos;
-		}
-
-		template <std::size_t N>
-		void CopyTo(char (&a_buffer)[N], std::string_view a_text)
-		{
-			const auto n = std::min(a_text.size(), N - 1);
-			std::memcpy(a_buffer, a_text.data(), n);
-			a_buffer[n] = '\0';
-		}
-
-		std::string Slots(const RE::TESObjectARMO* a_armor)
-		{
-			const auto  mask = static_cast<std::uint32_t>(a_armor->GetSlotMask().underlying());
-			std::string out;
-			for (int i = 0; i < 32; ++i) {
-				if (mask & (1u << i)) {
-					out += (out.empty() ? "" : " ") + std::to_string(i + 30);
-				}
-			}
-			return out;
-		}
-
-		RE::TESFaction* RadiantRaimentFaction()
-		{
-			const auto& list = VendorFactions(Source::RadiantRaiment);
-			return list.empty() ? nullptr : list.front();
-		}
-
-		const char* Kind(RE::TESObjectARMO* a_armor)
-		{
-			// What Radiant Raiment thinks of it: that's the only vendor with a restrictive list.
-			return Stocker::IsClothingLike(a_armor) ? "clothing" : "armour";
-		}
 
 		// --- loaded armour by mod (built once, on first use) ---------------------------------
 
@@ -167,324 +73,6 @@ namespace IOD::UI
 				std::ranges::sort(mod.armour, [](auto* a, auto* b) { return std::string_view(a->GetName()) < std::string_view(b->GetName()); });
 				g_mods.push_back(std::move(mod));
 			}
-		}
-
-		std::vector<RE::TESObjectARMO*> OutfitPieces(const RE::BGSOutfit* a_outfit)
-		{
-			std::vector<RE::TESObjectARMO*> pieces;
-			if (a_outfit) {
-				for (auto* item : a_outfit->outfitItems) {
-					if (auto* armor = item ? item->As<RE::TESObjectARMO>() : nullptr) {
-						if (std::ranges::find(pieces, armor) == pieces.end()) {
-							pieces.push_back(armor);
-						}
-					}
-				}
-			}
-			return pieces;
-		}
-
-		std::string OutfitLabel(const RE::BGSOutfit* a_outfit)
-		{
-			const char* edid = a_outfit->GetFormEditorID();
-			if (edid && *edid) {
-				return edid;
-			}
-			return fmt::format("Outfit {}", FormString(a_outfit));
-		}
-
-		// --- a set being edited -----------------------------------------------------------
-
-		struct Draft
-		{
-			bool                     active{ false };
-			std::size_t              file{ 0 };
-			std::size_t              index{ SIZE_MAX };  // SIZE_MAX: new, not yet saved
-			nlohmann::json           original;           // unknown fields are kept
-			char                     name[128]{};
-			bool                     enabled{ true };
-			bool                     unique{ true };
-			std::string              outfit;
-			std::vector<std::string> pieces;
-			std::array<bool, 3>      sources{};
-			int                      rarity{ 0 };
-			bool                     hasPrice{ false };
-			int                      price{ 1000 };
-			int                      reqType{ kReqNone };
-			int                      reqValue{ 0 };
-			int                      reqSkill{ 0 };
-			int                      reqFaction{ 0 };
-			char                     reqRef[128]{};
-			bool                     dirty{ false };
-			bool                     confirmDelete{ false };
-			std::string              status;  // last save result
-		};
-		Draft g_draft;
-
-		struct Resolved
-		{
-			std::vector<RE::TESObjectARMO*> pieces;
-			std::size_t                     missing{ 0 };
-		};
-
-		Resolved Resolve(const std::string& a_outfit, const std::vector<std::string>& a_pieces)
-		{
-			Resolved out;
-			if (!a_outfit.empty()) {
-				auto* form = LookupFormString(a_outfit);
-				if (auto* outfit = form ? form->As<RE::BGSOutfit>() : nullptr) {
-					out.pieces = OutfitPieces(outfit);
-				} else {
-					++out.missing;
-				}
-			}
-			for (const auto& ref : a_pieces) {
-				auto* form = LookupFormString(ref);
-				auto* armor = form ? form->As<RE::TESObjectARMO>() : nullptr;
-				if (!armor) {
-					++out.missing;
-				} else if (std::ranges::find(out.pieces, armor) == out.pieces.end()) {
-					out.pieces.push_back(armor);
-				}
-			}
-			return out;
-		}
-
-		Resolved Resolve(const nlohmann::json& a_set)
-		{
-			std::vector<std::string> pieces;
-			if (a_set.contains("pieces") && a_set["pieces"].is_array()) {
-				for (const auto& p : a_set["pieces"]) {
-					if (p.is_string()) {
-						pieces.push_back(p.get<std::string>());
-					}
-				}
-			}
-			return Resolve(a_set.value("outfit", ""), pieces);
-		}
-
-		// How many of a source's vendors can trade these pieces.
-		std::pair<std::size_t, std::size_t> TradeCount(const std::vector<RE::TESObjectARMO*>& a_pieces, Source a_source)
-		{
-			const auto& factions = VendorFactions(a_source);
-			std::size_t ok = 0;
-			for (auto* faction : factions) {
-				ok += Stocker::CanTradePieces(a_pieces, faction) ? 1 : 0;
-			}
-			return { ok, factions.size() };
-		}
-
-		std::string SourceWarning(const std::vector<RE::TESObjectARMO*>& a_pieces, Source a_source)
-		{
-			if (a_pieces.empty()) {
-				return {};
-			}
-			const auto [ok, total] = TradeCount(a_pieces, a_source);
-			if (ok == 0) {
-				return a_source == Source::RadiantRaiment ?
-				           "Radiant Raiment only sells clothing and jewellery: this set will never appear there." :
-				           fmt::format("No {} vendor trades this kind of item: it will never appear there.", SourceName(a_source));
-			}
-			if (ok < total) {
-				return fmt::format("Only {} of {} vendors trade this kind of item.", ok, total);
-			}
-			return {};
-		}
-
-		void LoadDraft(std::size_t a_file, std::size_t a_index)
-		{
-			auto& files = SetFiles::Get().Files();
-			const auto& entry = files[a_file].Sets()[a_index];
-			g_draft = Draft{};
-			g_draft.active = true;
-			g_draft.file = a_file;
-			g_draft.index = a_index;
-			g_draft.original = entry;
-			CopyTo(g_draft.name, entry.value("name", ""));
-			g_draft.enabled = entry.value("enabled", true);
-			g_draft.unique = entry.value("unique", true);
-			g_draft.outfit = entry.value("outfit", "");
-			if (entry.contains("pieces") && entry["pieces"].is_array()) {
-				for (const auto& p : entry["pieces"]) {
-					if (p.is_string()) {
-						g_draft.pieces.push_back(p.get<std::string>());
-					}
-				}
-			}
-			if (entry.contains("sources") && entry["sources"].is_array()) {
-				for (const auto& s : entry["sources"]) {
-					if (const auto source = s.is_string() ? ParseSource(s.get<std::string>()) : std::nullopt) {
-						g_draft.sources[static_cast<std::size_t>(*source)] = true;
-					}
-				}
-			}
-			const auto rarity = Normalise(entry.value("rarity", "common"));
-			g_draft.rarity = rarity == "rare" ? 1 : rarity == "legendary" ? 2 : 0;
-			if (entry.contains("price") && entry["price"].is_number_integer()) {
-				g_draft.hasPrice = true;
-				g_draft.price = entry["price"].get<int>();
-			}
-			if (entry.contains("requirement") && entry["requirement"].is_object()) {
-				const auto& req = entry["requirement"];
-				const auto  type = Normalise(req.value("type", ""));
-				for (int i = 1; i < static_cast<int>(kReqJsonTypes.size()); ++i) {
-					if (type == kReqJsonTypes[i]) {
-						g_draft.reqType = i;
-					}
-				}
-				g_draft.reqValue = req.value("value", req.value("rank", 0));
-				if (g_draft.reqType == kReqSkill) {
-					const auto skill = Normalise(req.value("skill", ""));
-					for (int i = 0; i < static_cast<int>(kSkills.size()); ++i) {
-						if (Normalise(kSkills[i]) == skill) {
-							g_draft.reqSkill = i;
-						}
-					}
-				} else if (g_draft.reqType == kReqFaction) {
-					const auto ref = req.value("faction", "");
-					auto*      form = LookupFormString(ref);
-					g_draft.reqFaction = kFactionOther;
-					for (int i = 0; i < kFactionOther; ++i) {
-						if (form && LookupFormString(kFactions[i].ref) == form) {
-							g_draft.reqFaction = i;
-						}
-					}
-					CopyTo(g_draft.reqRef, ref);
-				} else if (g_draft.reqType == kReqQuest) {
-					CopyTo(g_draft.reqRef, req.value("quest", ""));
-				} else if (g_draft.reqType == kReqBlessing) {
-					CopyTo(g_draft.reqRef, req.value("god", ""));
-				}
-			}
-		}
-
-		void NewDraft(std::string a_name, std::string a_outfit, std::vector<std::string> a_pieces)
-		{
-			auto& files = SetFiles::Get();
-			g_draft = Draft{};
-			g_draft.active = true;
-			g_draft.file = files.DefaultFile();
-			g_draft.index = SIZE_MAX;
-			CopyTo(g_draft.name, a_name);
-			g_draft.outfit = std::move(a_outfit);
-			g_draft.pieces = std::move(a_pieces);
-			// Sold where it can be: clothing at Radiant Raiment, anything else at caravans and fences.
-			const auto resolved = Resolve(g_draft.outfit, g_draft.pieces).pieces;
-			if (TradeCount(resolved, Source::RadiantRaiment).first > 0) {
-				g_draft.sources[static_cast<std::size_t>(Source::RadiantRaiment)] = true;
-			} else {
-				g_draft.sources[static_cast<std::size_t>(Source::KhajiitCaravans)] = true;
-				g_draft.sources[static_cast<std::size_t>(Source::ThievesGuild)] = true;
-			}
-			g_draft.dirty = true;
-		}
-
-		nlohmann::json DraftToJson()
-		{
-			nlohmann::json entry = g_draft.original.is_object() ? g_draft.original : nlohmann::json::object();
-			for (const auto* key : { "enabled", "outfit", "pieces", "sources", "rarity", "price", "requirement", "unique" }) {
-				entry.erase(key);
-			}
-			entry["name"] = std::string(g_draft.name);
-			if (!g_draft.enabled) {
-				entry["enabled"] = false;
-			}
-			if (!g_draft.outfit.empty()) {
-				entry["outfit"] = g_draft.outfit;
-			}
-			if (!g_draft.pieces.empty()) {
-				entry["pieces"] = g_draft.pieces;
-			}
-			auto sources = nlohmann::json::array();
-			for (const auto source : kAllSources) {
-				if (g_draft.sources[static_cast<std::size_t>(source)]) {
-					sources.push_back(std::string(SourceName(source)));
-				}
-			}
-			entry["sources"] = sources;
-			entry["rarity"] = kRarities[static_cast<std::size_t>(g_draft.rarity)];
-			if (g_draft.hasPrice) {
-				entry["price"] = std::max(0, g_draft.price);
-			}
-			if (g_draft.reqType != kReqNone) {
-				nlohmann::json req{ { "type", kReqJsonTypes[static_cast<std::size_t>(g_draft.reqType)] } };
-				switch (g_draft.reqType) {
-				case kReqSkill:
-					req["skill"] = kSkills[static_cast<std::size_t>(g_draft.reqSkill)];
-					req["value"] = g_draft.reqValue;
-					break;
-				case kReqFaction:
-					req["faction"] = g_draft.reqFaction == kFactionOther ? std::string(g_draft.reqRef) : std::string(kFactions[static_cast<std::size_t>(g_draft.reqFaction)].ref);
-					req["rank"] = g_draft.reqValue;
-					break;
-				case kReqQuest:
-					req["quest"] = std::string(g_draft.reqRef);
-					break;
-				case kReqBlessing:
-					req["god"] = std::string(g_draft.reqRef);
-					break;
-				default:
-					req["value"] = g_draft.reqValue;
-					break;
-				}
-				entry["requirement"] = req;
-			}
-			if (!g_draft.unique) {
-				entry["unique"] = false;
-			}
-			return entry;
-		}
-
-		void ApplyChanges()
-		{
-			// The game thread re-reads the files and re-syncs the vendors.
-			SKSE::GetTaskInterface()->AddTask([]() { Stocker::ReloadCatalog(); });
-		}
-
-		bool SaveDraft()
-		{
-			auto& store = SetFiles::Get();
-			auto& file = store.Files()[g_draft.file];
-			auto& sets = file.Sets();
-			const std::string name = g_draft.name;
-			if (name.empty()) {
-				g_draft.status = "Give the set a name first.";
-				return false;
-			}
-			for (std::size_t i = 0; i < sets.size(); ++i) {
-				if (i != g_draft.index && sets[i].value("name", "") == name) {
-					g_draft.status = fmt::format("{}.json already has a set called \"{}\".", file.stem, name);
-					return false;
-				}
-			}
-			const auto entry = DraftToJson();
-			if (g_draft.index == SIZE_MAX) {
-				sets.push_back(entry);
-				g_draft.index = sets.size() - 1;
-			} else {
-				sets[g_draft.index] = entry;
-			}
-			if (!store.Save(g_draft.file)) {
-				g_draft.status = "Could not save; see ImmersiveOutfitDistribution.log.";
-				return false;
-			}
-			g_draft.original = entry;
-			g_draft.dirty = false;
-			g_draft.status = fmt::format("Saved to {}.json. Vendors restock with it the next time you talk to them.", file.stem);
-			ApplyChanges();
-			return true;
-		}
-
-		void DeleteDraft()
-		{
-			auto& store = SetFiles::Get();
-			if (g_draft.index != SIZE_MAX) {
-				auto& sets = store.Files()[g_draft.file].Sets();
-				sets.erase(sets.begin() + static_cast<std::ptrdiff_t>(g_draft.index));
-				store.Save(g_draft.file);
-				ApplyChanges();
-			}
-			g_draft = Draft{};
 		}
 
 		// --- piece picker (shared by the editor and "New set") ------------------------------
@@ -773,14 +361,14 @@ namespace IOD::UI
 			ImGui::Separator();
 			ImGui::BeginDisabled(!g_draft.dirty);
 			if (ImGui::Button("Save")) {
-				SaveDraft();
+				SaveDraft(g_draft);
 			}
 			ImGui::SameLine();
 			if (ImGui::Button("Undo changes")) {
 				if (g_draft.index == SIZE_MAX) {
 					g_draft = Draft{};
 				} else {
-					LoadDraft(g_draft.file, g_draft.index);
+					LoadDraft(g_draft, g_draft.file, g_draft.index);
 				}
 			}
 			ImGui::EndDisabled();
@@ -796,7 +384,7 @@ namespace IOD::UI
 				}
 			} else {
 				if (ImGui::Button("Really delete?")) {
-					DeleteDraft();
+					DeleteDraft(g_draft);
 					return;
 				}
 				ImGui::SameLine();
@@ -814,6 +402,7 @@ namespace IOD::UI
 
 		void __stdcall RenderSets()
 		{
+			std::scoped_lock lock(Lock());
 			auto& store = SetFiles::Get();
 			ImGui::TextWrapped("Every set IOD distributes. Click one to edit it. Changes are saved to its file and apply at once; vendors restock with them the next time you talk to them.");
 			ImGui::SetNextItemWidth(260.0f);
@@ -848,7 +437,7 @@ namespace IOD::UI
 						ImGui::TableNextColumn();
 						const bool selected = g_draft.active && g_draft.file == f && g_draft.index == i;
 						if (ImGui::Selectable(name.c_str(), selected, ImGui::ImGuiSelectableFlags_SpanAllColumns)) {
-							LoadDraft(f, i);
+							LoadDraft(g_draft, f, i);
 						}
 						if (files.size() > 1 && ImGui::IsItemHovered()) {
 							ImGui::SetTooltip("%s.json", files[f].stem.c_str());
@@ -907,6 +496,7 @@ namespace IOD::UI
 
 		void __stdcall RenderNewSet()
 		{
+			std::scoped_lock lock(Lock());
 			ImGui::TextWrapped("Pick the mod that adds the outfit. If it defines outfit records, one click makes a set; otherwise choose its pieces. New sets go to MyOutfits.json and open in \"Sets\" for the details (where, rarity, price, requirement).");
 			if (ModCombo(g_newPicker)) {
 				g_newName[0] = '\0';
@@ -926,7 +516,7 @@ namespace IOD::UI
 						ImGui::PushID(outfit);
 						const auto label = OutfitLabel(outfit);
 						if (ImGui::SmallButton("Make set")) {
-							NewDraft(label, FormString(outfit), {});
+							NewDraft(g_draft, label, FormString(outfit), {});
 						}
 						ImGui::SameLine();
 						ImGui::Text("%s  (%zu pieces)", label.c_str(), pieces.size());
@@ -950,7 +540,7 @@ namespace IOD::UI
 						for (auto* armor : g_newPicker.chosen) {
 							refs.push_back(FormString(armor));
 						}
-						NewDraft(g_newName, {}, std::move(refs));
+						NewDraft(g_draft, g_newName, {}, std::move(refs));
 						g_newPicker.chosen.clear();
 						g_newName[0] = '\0';
 					}
@@ -966,6 +556,7 @@ namespace IOD::UI
 
 		void __stdcall RenderVendors()
 		{
+			std::scoped_lock lock(Lock());
 			const auto [period, lines] = Stocker::Snapshot();
 			if (period < 0) {
 				ImGui::TextDisabled("Load a save to see this period's stock.");
@@ -1011,6 +602,7 @@ namespace IOD::UI
 
 		void __stdcall RenderSettings()
 		{
+			std::scoped_lock lock(Lock());
 			auto& settings = Settings::Get();
 			bool  changed = false;
 			changed |= ImGui::Checkbox("Show \"New arrivals\" when a vendor has new sets", &settings.arrivalMessage);
@@ -1031,7 +623,6 @@ namespace IOD::UI
 			spdlog::info("SKSE Menu Framework not installed: no in-game settings page");
 			return;
 		}
-		SetFiles::Get().Load();
 		SKSEMenuFramework::SetSection("Immersive Outfit Distribution");
 		SKSEMenuFramework::AddSectionItem("Sets", RenderSets);
 		SKSEMenuFramework::AddSectionItem("New set", RenderNewSet);
