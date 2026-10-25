@@ -1,3 +1,7 @@
 * text=auto
 *.yml text eol=lf
 *.json text eol=lf
+# Keep the Caprica patch byte-exact on Windows runners (autocrlf would break git apply)
+*.patch -text
+*.psc text eol=crlf
+*.py text eol=lf
