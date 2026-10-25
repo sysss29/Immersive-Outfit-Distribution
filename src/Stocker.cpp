@@ -117,41 +117,43 @@ namespace IOD
 		}
 	}
 
-	// A vendor only lists chest items its buy/sell list allows: Radiant Raiment takes items tagged
-	// VendorItemClothing or VendorItemJewelry, so a set tagged VendorItemArmor stays hidden. Each
-	// piece gets a keyword the vendor accepts (a side effect: those vendors also buy it from you).
-	void Stocker::MakeTradeable()
+	// A vendor only lists chest items its buy/sell list allows (e.g. Radiant Raiment: items tagged
+	// VendorItemClothing or VendorItemJewelry). IOD changes nothing about this: a set is offered
+	// at a vendor only if every piece is one that vendor trades.
+	bool Stocker::CanTrade(const OutfitSet& a_set, RE::TESFaction* a_faction)
+	{
+		auto* list = a_faction->vendorData.vendorSellBuyList;
+		if (!list) {
+			return true;  // no list: the vendor trades anything
+		}
+		const bool excluding = a_faction->vendorData.vendorValues.notBuySell;
+		for (auto* piece : a_set.pieces) {
+			auto*      form = piece->As<RE::BGSKeywordForm>();
+			const bool listed = form && std::ranges::any_of(list->forms, [&](RE::TESForm* a_form) {
+				auto* keyword = a_form ? a_form->As<RE::BGSKeyword>() : nullptr;
+				return keyword && form->HasKeyword(keyword);
+			});
+			if (listed == excluding) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	void Stocker::CheckTradeable()
 	{
 		for (const auto& set : Catalog::GetSingleton().Sets()) {
 			for (const auto source : kAllSources) {
 				if (!set.HasSource(source)) {
 					continue;
 				}
-				for (auto* faction : VendorFactions(source)) {
-					auto* list = faction->vendorData.vendorSellBuyList;
-					if (!list) {
-						continue;  // no list: the vendor trades anything
-					}
-					std::vector<RE::BGSKeyword*> keywords;
-					for (auto* form : list->forms) {
-						if (auto* keyword = form ? form->As<RE::BGSKeyword>() : nullptr) {
-							keywords.push_back(keyword);
-						}
-					}
-					const bool excluding = faction->vendorData.vendorValues.notBuySell;
-					for (auto* piece : set.pieces) {
-						auto* form = piece->As<RE::BGSKeywordForm>();
-						if (!form) {
-							continue;
-						}
-						const bool matches = std::ranges::any_of(keywords, [&](auto* k) { return form->HasKeyword(k); });
-						if (excluding && matches) {
-							spdlog::warn("\"{}\": a piece has a keyword {} refuses to trade", set.name, faction->GetName());
-						} else if (!excluding && !matches && !keywords.empty()) {
-							form->AddKeyword(keywords.back());
-							spdlog::info("\"{}\": tagged {:08X} so {} can trade it", set.name, piece->GetFormID(), faction->GetName());
-						}
-					}
+				const auto& factions = VendorFactions(source);
+				const auto  ok = std::ranges::count_if(factions, [&](RE::TESFaction* a_f) { return CanTrade(set, a_f); });
+				if (ok == 0) {
+					spdlog::warn("\"{}\" will never appear at {}: it doesn't trade this kind of item (e.g. armour at a clothier)",
+						set.name, SourceName(source));
+				} else if (ok < static_cast<std::ptrdiff_t>(factions.size())) {
+					spdlog::warn("\"{}\": only {} of {} {} vendor(s) trade this kind of item", set.name, ok, factions.size(), SourceName(source));
 				}
 			}
 		}
@@ -180,6 +182,22 @@ namespace IOD
 
 	void Stocker::OnGameLoaded()
 	{
+		// Redraw if the save's allocation puts a set where it can't be traded (e.g. a save from an
+		// older version, or a set file changed since).
+		auto& state = State::Get();
+		for (const auto& [factionID, ids] : state.allocation) {
+			auto* faction = RE::TESForm::LookupByID<RE::TESFaction>(factionID);
+			const bool bad = faction && std::ranges::any_of(ids, [&](const std::string& a_id) {
+				const auto* set = Catalog::GetSingleton().Find(a_id);
+				return set && !CanTrade(*set, faction);
+			});
+			if (bad) {
+				spdlog::info("Saved allocation has a set its vendor can't trade; redrawing");
+				state.allocPeriod = -1;
+				state.stocked.clear();
+				break;
+			}
+		}
 		// Base forms are not reloaded with a save, so g_baseEntries stays valid: the sync removes
 		// what the previous save's period put in and adds the loaded save's allocation.
 		SyncBaseContainers();
@@ -341,7 +359,7 @@ namespace IOD
 						if (set.unique && state.owned.contains(set.id)) {
 							continue;
 						}
-						if (!IsMet(set.requirement, player)) {
+						if (!IsMet(set.requirement, player) || !CanTrade(set, faction)) {
 							continue;
 						}
 						pool.push_back(&set);

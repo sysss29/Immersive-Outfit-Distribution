@@ -10,6 +10,9 @@ Personal project for Skyrim SE **1.7.104** (SKSE 2.3.1). No support is offered.
 
 - Full sets stocked at **Radiant Raiment** (Endarie and Taarie, Solitude), **Khajiit caravans**
   and **Thieves Guild** fences.
+- Vendors keep their vanilla trade rules: Radiant Raiment only sells clothing and jewellery, so an
+  armour set placed there never appears (the log warns at startup; the in-game settings page will
+  warn too, milestone 2). Caravans and fences trade anything.
 - Each vendor shows 0 to 3 sets per 48 in-game hours (weighted towards 1-2), drawn by rarity;
   a set appears at one vendor at a time. Reloading a save keeps the draw.
 - Optional per-set price (spread over the pieces) and one requirement: level, base
