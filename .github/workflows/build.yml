@@ -127,8 +127,10 @@ jobs:
           Copy-Item nl_online/skyui/source/*.psc $h -Force
           $out = New-Item -ItemType Directory -Force -Path package/Scripts
           $flags = (Resolve-Path papyrus-headers/TESV_Papyrus_Flags.flg).Path
+          # Absolute paths: Caprica reads a relative folder as a script namespace.
+          $scripts = @((Resolve-Path papyrus/IOD_Native.psc).Path, (Resolve-Path papyrus/IOD_MCM.psc).Path)
           & caprica-bin/Caprica.exe --game skyrim -f $flags -i $h.FullName `
-            -o $out.FullName --release --final papyrus/IOD_Native.psc papyrus/IOD_MCM.psc
+            -o $out.FullName --release --final @scripts
           if ($LASTEXITCODE -ne 0) { throw "Papyrus compile failed" }
           $src = New-Item -ItemType Directory -Force -Path package/Scripts/Source
           Copy-Item papyrus/*.psc $src
