@@ -9,8 +9,9 @@ namespace IOD
 	//    game's activation; the vanilla blessing still happens.
 	//  - Daedric statues are decoration (not activatable): pressing Activate while facing one within
 	//    reach, with nothing else under the crosshair, counts as praying to it.
-	// Praying makes that god your blessing. Carrying the offering for one of the god's sets opens
-	// "Offer / Leave"; accepting takes the items and gives a full set. One offering per god per week.
+	// Praying makes that god your blessing. A Daedric prince then shows every set he would part
+	// with and its tribute; the player chooses one they can afford and qualify for. The Divines
+	// don't trade: a Divine set is given freely when its requirement (e.g. a quest) is met.
 	class Shrines :
 		public RE::BSTEventSink<RE::TESActivateEvent>,
 		public RE::BSTEventSink<RE::InputEvent*>
@@ -31,6 +32,8 @@ namespace IOD
 		RE::BSEventNotifyControl ProcessEvent(RE::InputEvent* const* a_event, RE::BSTEventSource<RE::InputEvent*>*) override;
 
 		void        Pray(int a_god, bool a_vanillaBlessing);  // game thread
+		void        CheckNearbyStatues();                     // game thread
+		static void StartWatching();                          // background timer for CheckNearbyStatues
 		std::string AcceptLine(int a_god) const;
 
 	private:

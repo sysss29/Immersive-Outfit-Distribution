@@ -289,8 +289,9 @@ Function ShowShrines()
 	AddTextOption("Current blessing", IOD_Native.Blessing(), OPTION_FLAG_DISABLED)
 	AddTextOption("Pray at a shrine to change it", "", OPTION_FLAG_DISABLED)
 	AddEmptyOption()
-	AddHeaderOption("Testing")
-	oClearCooldowns = AddTextOption("Clear offering cooldowns", "Clear")
+	AddHeaderOption("How it works")
+	AddTextOption("Daedra: tribute, you choose", "", OPTION_FLAG_DISABLED)
+	AddTextOption("Divines: gift once a deed is done", "", OPTION_FLAG_DISABLED)
 	SetCursorPosition(1)
 	AddHeaderOption("Gods with sets")
 	String[] lines = IOD_Native.ShrineLines()
@@ -545,7 +546,7 @@ Event OnOptionHighlight(Int aiOption)
 	ElseIf aiOption == oShrine
 		String offering = IOD_Native.GetText(selected, "offering")
 		If offering == ""
-			SetInfoText("Pray at this god's shrine carrying their offering to receive the set.")
+			SetInfoText("Daedra: offer the tribute at their statue. Divines: given freely at their shrine once the requirement (e.g. a quest) is met.")
 		Else
 			SetInfoText(offering)
 		EndIf

@@ -39,6 +39,7 @@ namespace
 			IOD::Stocker::Install();
 			IOD::Shrines::GetSingleton()->Load();
 			IOD::Shrines::GetSingleton()->Install();
+			IOD::Shrines::StartWatching();
 			{
 				std::scoped_lock lock(IOD::Edit::Lock());
 				IOD::SetFiles::Get().Load();
@@ -55,7 +56,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 {
 	SKSE::Init(a_skse);
 	InitLogging();
-	spdlog::info("Immersive Outfit Distribution 0.4.0 on Skyrim {}", REL::Module::get().version().string());
+	spdlog::info("Immersive Outfit Distribution 0.4.1 on Skyrim {}", REL::Module::get().version().string());
 
 	IOD::State::Register();
 	IOD::Papyrus::Install();

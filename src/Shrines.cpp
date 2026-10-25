@@ -61,70 +61,87 @@ namespace IOD
 			RE::SendHUDMessage::ShowHUDMessage(a_text.c_str());
 		}
 
-		double RarityWeight(Rarity a_rarity)
+		// What the player still lacks for an offering, e.g. "Skooma, 2 Wine"; empty when carried.
+		std::string Missing(const RE::TESObjectREFR::InventoryCountMap& a_counts, const Offering& a_offering)
 		{
-			return a_rarity == Rarity::kLegendary ? 1.0 : a_rarity == Rarity::kRare ? 3.0 : 6.0;
+			std::string text;
+			for (const auto& item : a_offering) {
+				const auto lack = item.count - CountOf(a_counts, item);
+				if (lack <= 0) {
+					continue;
+				}
+				auto*       first = item.any.front();
+				const bool  gold = first->GetFormID() == 0xF;
+				std::string name = gold ? "gold" : first->GetName();
+				text += (text.empty() ? "" : ", ") + (lack > 1 || gold ? fmt::format("{} {}", lack, name) : name);
+			}
+			return text;
 		}
 
-		// "Offer" / "Leave" message box; the answer is handled on the game thread.
-		class OfferCallback : public RE::IMessageBoxCallback
+		void Grant(RE::PlayerCharacter* a_player, const OutfitSet& a_set)
+		{
+			for (auto* piece : a_set.pieces) {
+				a_player->AddObjectToContainer(piece, nullptr, 1, nullptr);
+			}
+			State::Get().owned.insert(a_set.id);
+		}
+
+		// Answer to the tribute list: button i is the i-th set offered, the last one is "Leave".
+		class TributeCallback : public RE::IMessageBoxCallback
 		{
 		public:
-			OfferCallback(int a_god, std::string a_set) :
-				_god(a_god), _set(std::move(a_set)) {}
+			TributeCallback(int a_god, std::vector<std::string> a_sets) :
+				_god(a_god), _sets(std::move(a_sets)) {}
 
 			void Run(std::uint8_t a_button) override
 			{
-				if (a_button != 0) {
+				if (a_button >= _sets.size()) {
 					return;  // Leave
 				}
-				SKSE::GetTaskInterface()->AddTask([god = _god, set = _set]() {
+				SKSE::GetTaskInterface()->AddTask([god = _god, id = _sets[a_button]]() {
 					auto*       player = RE::PlayerCharacter::GetSingleton();
-					const auto* chosen = Catalog::GetSingleton().Find(set);
-					if (!player || !chosen) {
+					const auto* chosen = Catalog::GetSingleton().Find(id);
+					if (!player || !chosen || State::Get().owned.contains(id)) {
 						return;
 					}
 					const auto& offering = Shrines::GetSingleton()->OfferingFor(*chosen, god);
-					if (!Carries(player, offering)) {
-						Notify(fmt::format("{} waits for the offering you promised.", GodName(god)));
+					if (!Carries(player, offering) || !IsMet(chosen->requirement, player)) {
+						Notify(fmt::format("{} is not amused.", GodName(god)));
 						return;
 					}
 					Take(player, offering);
-					for (auto* piece : chosen->pieces) {
-						player->AddObjectToContainer(piece, nullptr, 1, nullptr);
-					}
-					auto& state = State::Get();
-					state.owned.insert(chosen->id);
-					state.lastOffering[god] = Today();
-					state.blessing = god;
-					spdlog::info("{} accepted {} and granted \"{}\"", GodName(god), DescribeOffering(offering), chosen->name);
+					Grant(player, *chosen);
+					spdlog::info("{} accepted {} for \"{}\"", GodName(god), DescribeOffering(offering), chosen->name);
 					Notify(Shrines::GetSingleton()->AcceptLine(god));
 					Notify(fmt::format("Received: {}", chosen->name));
 				});
 			}
 
 		private:
-			int         _god;
-			std::string _set;
+			int                      _god;
+			std::vector<std::string> _sets;
 		};
 
-		void AskToOffer(int a_god, const OutfitSet& a_set, const Offering& a_offering)
+		bool ShowBox(const std::string& a_body, const std::vector<std::string>& a_buttons, RE::IMessageBoxCallback* a_callback)
 		{
 			auto* factory = RE::MessageDataFactoryManager::GetSingleton();
 			auto* strings = RE::InterfaceStrings::GetSingleton();
 			auto* creator = factory && strings ? factory->GetCreator<RE::MessageBoxData>(strings->messageBoxData) : nullptr;
 			auto* box = creator ? creator->Create() : nullptr;
 			if (!box) {
-				spdlog::error("Could not create the offering message box");
-				return;
+				spdlog::error("Could not create a message box");
+				return false;
 			}
-			box->bodyText = fmt::format("{} is listening.\n\nOffer {}?", GodName(a_god), DescribeOffering(a_offering)).c_str();
-			box->buttonText.push_back("Offer");
-			box->buttonText.push_back("Leave");
-			box->cancelButtonIndex = 1;
+			box->bodyText = a_body.c_str();
+			for (const auto& button : a_buttons) {
+				box->buttonText.push_back(button.c_str());
+			}
+			box->cancelButtonIndex = static_cast<std::int32_t>(a_buttons.size()) - 1;
 			box->isCancellable = true;
-			box->callback = RE::BSTSmartPointer<RE::IMessageBoxCallback>(new OfferCallback(a_god, a_set.id));
+			box->verticalButtons = a_buttons.size() > 2;
+			box->callback = RE::BSTSmartPointer<RE::IMessageBoxCallback>(a_callback);
 			RE::MessageBoxMenu::QueueMessage(box);
+			return true;
 		}
 	}
 
@@ -338,44 +355,104 @@ namespace IOD
 		}
 		if (changed) {
 			spdlog::info("Blessing: {}", GodName(a_god));
-			if (Settings::Get().arrivalMessage) {
-				Notify(fmt::format("You are now blessed by {}.", GodName(a_god)));
-			}
+			Notify(fmt::format("You are now blessed by {}.", GodName(a_god)));
 		}
 
-		// Sets this god grants that the player hasn't received yet, and whose offering they carry.
-		std::vector<const OutfitSet*> carried;
+		std::vector<const OutfitSet*> sets;  // this god's sets the player hasn't received
 		for (const auto& set : Catalog::GetSingleton().Sets()) {
-			if (set.HasGod(a_god) && !state.owned.contains(set.id) && Carries(player, OfferingFor(set, a_god))) {
-				carried.push_back(&set);
+			if (set.HasGod(a_god) && !state.owned.contains(set.id)) {
+				sets.push_back(&set);
 			}
 		}
-		if (carried.empty()) {
-			return;  // no offering: nothing more happens
-		}
-		if (const auto left = CooldownDaysLeft(a_god); left > 0.0f) {
-			Notify(fmt::format("{} has received an offering from you recently. Return in {} day(s).", GodName(a_god),
-				static_cast<int>(std::ceil(left))));
+		if (sets.empty()) {
 			return;
 		}
-		std::vector<const OutfitSet*> worthy;
-		for (const auto* set : carried) {
-			if (IsMet(set->requirement, player)) {
-				worthy.push_back(set);
+
+		if (IsDivine(a_god)) {
+			// The Divines don't trade: they reward deeds. A set whose requirement is met (typically
+			// a quest completed) is given freely, once.
+			for (const auto* set : sets) {
+				if (IsMet(set->requirement, player)) {
+					Grant(player, *set);
+					spdlog::info("{} rewards the player with \"{}\"", GodName(a_god), set->name);
+					Notify(AcceptLine(a_god));
+					Notify(fmt::format("{} rewards you: {}", GodName(a_god), set->name));
+				}
+			}
+			return;
+		}
+
+		// Daedra: show everything the prince would part with, and what it costs.
+		const auto               counts = player->GetInventoryCounts();
+		std::string              body = fmt::format("{} regards you.\n", GodName(a_god));
+		std::vector<std::string> buttons;
+		std::vector<std::string> ids;
+		constexpr std::size_t    kMaxListed = 8;
+		for (std::size_t i = 0; i < sets.size() && i < kMaxListed; ++i) {
+			const auto* set = sets[i];
+			const auto& offering = OfferingFor(*set, a_god);
+			if (offering.empty()) {
+				continue;
+			}
+			body += fmt::format("\n{}: {}", set->name, DescribeOffering(offering));
+			if (!IsMet(set->requirement, player)) {
+				body += fmt::format("\n   Not yet worthy: needs {}.", set->requirement.label);
+			} else if (const auto missing = Missing(counts, offering); !missing.empty()) {
+				body += fmt::format("\n   You lack {}.", missing);
+			} else {
+				body += "\n   You carry the tribute.";
+				buttons.push_back(fmt::format("Offer for {}", set->name));
+				ids.push_back(set->id);
 			}
 		}
-		if (worthy.empty()) {
-			Notify(fmt::format("{}: You are not yet worthy. (Needs {}.)", GodName(a_god), carried.front()->requirement.label));
+		if (sets.size() > kMaxListed) {
+			body += fmt::format("\n\n...and {} more.", sets.size() - kMaxListed);
+		}
+		buttons.emplace_back("Leave");
+		ShowBox(body, buttons, new TributeCallback(a_god, std::move(ids)));
+	}
+
+	// Called every few seconds: the first time the player comes near a prince's statue that has
+	// sets to give, a line hints at it.
+	void Shrines::CheckNearbyStatues()
+	{
+		auto* player = RE::PlayerCharacter::GetSingleton();
+		auto* tes = RE::TES::GetSingleton();
+		if (!player || !tes || !player->Is3DLoaded() || _statues.empty()) {
 			return;
 		}
-		std::vector<double> weights;
-		for (const auto* set : worthy) {
-			weights.push_back(RarityWeight(set->rarity));
+		auto&              state = State::Get();
+		std::optional<int> near;
+		tes->ForEachReferenceInRange(player, 1200.0f, [&](RE::TESObjectREFR* a_ref) {
+			const auto* base = a_ref ? a_ref->GetBaseObject() : nullptr;
+			if (base && _statues.contains(base->GetFormID()) && !a_ref->IsDisabled()) {
+				const int god = _byBase.at(base->GetFormID());
+				if (!state.noticed.contains(god)) {
+					near = god;
+					return RE::BSContainer::ForEachResult::kStop;
+				}
+			}
+			return RE::BSContainer::ForEachResult::kContinue;
+		});
+		if (!near) {
+			return;
 		}
-		static std::mt19937                     rng{ std::random_device{}() };
-		std::discrete_distribution<std::size_t> pick(weights.begin(), weights.end());
-		const auto*                             chosen = worthy[pick(rng)];
-		spdlog::info("{} offers \"{}\" for {}", GodName(a_god), chosen->name, DescribeOffering(OfferingFor(*chosen, a_god)));
-		AskToOffer(a_god, *chosen, OfferingFor(*chosen, a_god));
+		const bool hasSets = std::ranges::any_of(Catalog::GetSingleton().Sets(), [&](const OutfitSet& a_set) { return a_set.HasGod(*near); });
+		if (hasSets) {
+			state.noticed.insert(*near);
+			Notify(fmt::format("The statue of {} seems to watch you.", GodName(*near)));
+		}
+	}
+
+	void Shrines::StartWatching()
+	{
+		std::thread([]() {
+			for (;;) {
+				std::this_thread::sleep_for(std::chrono::seconds(3));
+				if (auto* tasks = SKSE::GetTaskInterface()) {
+					tasks->AddTask([]() { Shrines::GetSingleton()->CheckNearbyStatues(); });
+				}
+			}
+		}).detach();
 	}
 }

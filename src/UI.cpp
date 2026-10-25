@@ -202,7 +202,7 @@ namespace IOD::UI
 			}
 			const auto shrineLabel = fmt::format("Granted at shrines ({})###shrines", shrineCount);
 			if (ImGui::TreeNode(shrineLabel.c_str())) {
-				ImGui::TextDisabled("Carry the god's offering and pray at their shrine; the god gives one of their sets.");
+				ImGui::TextDisabled("Daedra: the tribute is shown at their statue and you choose. Divines: the set is a gift, given at their shrine once its requirement (e.g. a quest) is met.");
 				for (int god = 0; god < static_cast<int>(kGods.size()); ++god) {
 					if (god == 0) {
 						ImGui::SeparatorText("The Nine Divines");
@@ -218,7 +218,7 @@ namespace IOD::UI
 					if (!Shrines::GetSingleton()->HasShrine(god)) {
 						ImGui::TextColored(on ? kWarn : kDim, "no shrine in your game");
 					} else {
-						ImGui::TextColored(on ? kGood : kDim, "%s", OfferingText(g_draft, god).c_str());
+						ImGui::TextColored(on ? kGood : kDim, "%s", IsDivine(god) ? "gift, when the requirement is met" : OfferingText(g_draft, god).c_str());
 					}
 					ImGui::PopID();
 				}

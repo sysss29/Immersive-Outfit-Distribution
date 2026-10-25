@@ -369,7 +369,7 @@ namespace IOD::Papyrus
 			if (field == "offering") {  // what the set's (first) shrine asks
 				for (int g = 0; g < static_cast<int>(kGods.size()); ++g) {
 					if (d.gods[static_cast<std::size_t>(g)]) {
-						return Safe(fmt::format("{} asks: {}", GodName(g), OfferingText(d, g)));
+						return Safe(IsDivine(g) ? fmt::format("{} gives this set freely at their shrine once its requirement is met (choose one, e.g. a quest).", GodName(g)) : fmt::format("{} asks: {}", GodName(g), OfferingText(d, g)));
 					}
 				}
 				return "";
@@ -472,12 +472,10 @@ namespace IOD::Papyrus
 						left += state.owned.contains(set.id) ? 0 : 1;
 					}
 				}
-				const auto wait = Shrines::GetSingleton()->CooldownDaysLeft(g);
-				if (total == 0 && wait <= 0.0f) {
+				if (total == 0) {
 					continue;
 				}
-				std::string status = fmt::format("{} of {} set(s) left", left, total);
-				status += wait > 0.0f ? fmt::format(", next offering in {} day(s)", static_cast<int>(std::ceil(wait))) : ", ready";
+				std::string status = fmt::format("{} of {} set(s) left, {}", left, total, IsDivine(g) ? "gifts for deeds" : "for tribute");
 				if (!Shrines::GetSingleton()->HasShrine(g)) {
 					status += ", no shrine";
 				}
