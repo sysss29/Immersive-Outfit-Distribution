@@ -1,0 +1,94 @@
+name: Build Immersive Outfit Distribution
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+env:
+  # vcpkg version: the baseline CommonLibSSE-NG v12.1.0 builds with (see vcpkg.json)
+  VCPKG_COMMIT: ee12231b20c95013c6638d845d04c91559a1d1ff
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 150
+
+    steps:
+      - name: Check out (with CommonLibSSE-NG submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Get CMake and Ninja
+        uses: lukka/get-cmake@latest
+
+      - name: Set up MSVC environment
+        uses: TheMrMilchmann/setup-msvc-dev@v4.0.0
+        with:
+          arch: x64
+
+      - name: Pin vcpkg cache directories
+        shell: bash
+        run: |
+          echo "VCPKG_DOWNLOADS=${{ github.workspace }}/vcpkg_downloads" >> "$GITHUB_ENV"
+          echo "VCPKG_DEFAULT_BINARY_CACHE=${{ github.workspace }}/vcpkg_binary_cache" >> "$GITHUB_ENV"
+          mkdir -p "${{ github.workspace }}/vcpkg_downloads" "${{ github.workspace }}/vcpkg_binary_cache"
+
+      - name: Cache vcpkg packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ github.workspace }}/vcpkg_downloads
+            ${{ github.workspace }}/vcpkg_binary_cache
+          key: vcpkg-${{ env.VCPKG_COMMIT }}-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            vcpkg-${{ env.VCPKG_COMMIT }}-
+
+      - name: Set up vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
+          runVcpkgInstall: false
+
+      - name: Configure (installs dependencies; retried for flaky downloads)
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 60
+          max_attempts: 3
+          retry_wait_seconds: 30
+          shell: pwsh
+          command: |
+            # Build CommonLib from source with the same dependency versions as the plugin.
+            Remove-Item Env:GITHUB_ACTIONS -ErrorAction SilentlyContinue
+            cmake --preset release-msvc -DCOMMONLIB_ENABLE_IPO=OFF -DBUILD_TESTS=OFF
+
+      - name: Build
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Remove-Item Env:GITHUB_ACTIONS -ErrorAction SilentlyContinue
+          cmake --build --preset release-msvc
+          if ($LASTEXITCODE -ne 0) { throw "Build failed" }
+
+      - name: Package as a mod
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $plugins = New-Item -ItemType Directory -Force -Path package/SKSE/Plugins
+          $sets = New-Item -ItemType Directory -Force -Path package/SKSE/Plugins/ImmersiveOutfitDistribution
+          $dll = Get-ChildItem -Recurse -Path build/release-msvc -Filter ImmersiveOutfitDistribution.dll | Select-Object -First 1
+          if (-not $dll) { throw "DLL not found" }
+          Copy-Item $dll.FullName $plugins
+          $pdb = Get-ChildItem -Recurse -Path build/release-msvc -Filter ImmersiveOutfitDistribution.pdb | Select-Object -First 1
+          if ($pdb) { Copy-Item $pdb.FullName $plugins }
+          Copy-Item config/*.json $sets
+          Copy-Item README.md package/README-ImmersiveOutfitDistribution.md
+          Get-ChildItem -Recurse package | ForEach-Object { $_.FullName }
+
+      - name: Upload mod package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ImmersiveOutfitDistribution
+          path: package/
+          if-no-files-found: error

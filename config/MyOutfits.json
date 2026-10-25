@@ -1,0 +1,37 @@
+// Immersive Outfit Distribution - set file.
+// Every *.json file in Data/SKSE/Plugins/ImmersiveOutfitDistribution/ is loaded at game start.
+// Form references are "Plugin.esp|0xLocalID" (ESL plugins work too).
+//
+// Per set:
+//   name         required, unique within this file
+//   outfit       an outfit record the mod defines (all its armour pieces are used), and/or
+//   pieces       a list of armour records
+//   sources      "Radiant Raiment", "Khajiit caravans", "Thieves Guild"
+//   rarity       "Common" (default), "Rare", "Legendary"
+//   price        gold for the whole set (optional; spread over the pieces)
+//   requirement  optional, one of:
+//                  {"type": "level", "value": 10}
+//                  {"type": "health" | "magicka" | "stamina", "value": 200}
+//                  {"type": "skill", "skill": "Restoration", "value": 20}
+//                  {"type": "faction", "faction": "Skyrim.esm|0x29DA9", "rank": 1}
+//                  {"type": "quest", "quest": "Plugin.esp|0x...."}
+//   unique       true (default): leaves rotation once you own every piece
+//   enabled      true (default)
+{
+  "sets": [
+    {
+      "name": "Brutal Ravager",
+      "outfit": "hdm_BrutalRavager.esp|0x846",
+      "sources": ["Radiant Raiment"],
+      "rarity": "Common",
+      "price": 1500
+    },
+    {
+      "name": "Insane Dragon",
+      "outfit": "Amsedillir-InsaneDragon.esp|0x90B",
+      "sources": ["Radiant Raiment"],
+      "rarity": "Common",
+      "price": 2500
+    }
+  ]
+}
