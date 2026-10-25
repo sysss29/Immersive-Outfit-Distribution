@@ -8,8 +8,8 @@ namespace IOD::Edit
 {
 	inline constexpr std::array kRarities{ "Common", "Rare", "Legendary" };
 
-	inline constexpr std::array kRequirementTypes{ "None", "Character level", "Base Health", "Base Magicka", "Base Stamina",
-		"Skill level", "Faction rank", "Quest completed", "Blessing (milestone 4)" };
+	inline constexpr std::array kRequirementTypes{ "No requirement", "Character level", "Base Health", "Base Magicka", "Base Stamina",
+		"Skill level", "Faction rank", "Quest completed", "Blessing of a god" };
 	enum Req : int
 	{
 		kReqNone,

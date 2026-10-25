@@ -207,6 +207,7 @@ namespace IOD::Papyrus
 				d.sources[static_cast<std::size_t>(SourceOf(field))] = a_value;
 			}
 			SaveDraft(d);
+			spdlog::info("MCM: set {} {} = {} ({})", a_index, field, a_value, d.status);
 			return Safe(d.status);
 		}
 
@@ -278,6 +279,7 @@ namespace IOD::Papyrus
 				d.reqValue = std::clamp(d.reqValue, 0, std::max(0, MaxFactionRank(d)));
 			}
 			SaveDraft(d);
+			spdlog::info("MCM: set {} {} = {} ({})", a_index, field, a_value, d.status);
 			return Safe(d.status);
 		}
 
@@ -362,6 +364,7 @@ namespace IOD::Papyrus
 					out.emplace_back(f.label);
 				}
 			}
+			spdlog::info("MCM asked for list \"{}\": {} entries", list, out.size());
 			return out;
 		}
 

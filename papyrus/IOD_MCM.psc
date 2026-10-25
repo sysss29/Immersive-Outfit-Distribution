@@ -170,7 +170,7 @@ Function ShowEditor()
 
 	SetCursorPosition(1)
 	AddHeaderOption("Rarity and price")
-	String[] rarities = IOD_Native.Choices("rarity")
+	String[] rarities = ListOf("rarity")
 	oRarity = AddMenuOption("Rarity", rarities[IOD_Native.GetInt(s, "rarity")])
 	Bool hasPrice = IOD_Native.GetBool(s, "hasprice")
 	oHasPrice = AddToggleOption("Set a price", hasPrice)
@@ -182,7 +182,7 @@ Function ShowEditor()
 
 	AddHeaderOption("Requirement")
 	Int t = IOD_Native.GetInt(s, "reqtype")
-	String[] types = IOD_Native.Choices("reqtype")
+	String[] types = ListOf("reqtype")
 	oReqType = AddMenuOption("Type", types[t])
 	Int v = IOD_Native.GetInt(s, "reqvalue")
 	If t == REQ_LEVEL
@@ -190,11 +190,11 @@ Function ShowEditor()
 	ElseIf t == REQ_HEALTH || t == REQ_MAGICKA || t == REQ_STAMINA
 		oReqValue = AddSliderOption("At least", v, "{0}")
 	ElseIf t == REQ_SKILL
-		String[] skills = IOD_Native.Choices("skills")
+		String[] skills = ListOf("skills")
 		oReqSkill = AddMenuOption("Skill", skills[IOD_Native.GetInt(s, "reqskill")])
 		oReqValue = AddSliderOption("At least", v, "{0}")
 	ElseIf t == REQ_FACTION
-		String[] factions = IOD_Native.Choices("factions")
+		String[] factions = ListOf("factions")
 		Int f = IOD_Native.GetInt(s, "reqfaction")
 		oReqFaction = AddMenuOption("Faction", factions[f])
 		If f == FACTION_OTHER
@@ -249,6 +249,29 @@ Function ShowSettings()
 EndFunction
 
 ; ---- helpers ------------------------------------------------------------------------------
+
+; Lists for the menu dialogs, kept in the script (same order as the plugin uses).
+String[] Function ListOf(String asList)
+	String[] out
+	If asList == "reqtype"
+		out = new String[9]
+		out[0] = "No requirement"
+		out[1] = "Character level"
+		out[2] = "Base Health"
+		out[3] = "Base Magicka"
+		out[4] = "Base Stamina"
+		out[5] = "Skill level"
+		out[6] = "Faction rank"
+		out[7] = "Quest completed"
+		out[8] = "Blessing of a god"
+		Return out
+	EndIf
+	out = IOD_Native.Choices(asList)
+	If out.Length == 0
+		Debug.Trace("IOD_MCM: empty list " + asList)
+	EndIf
+	Return out
+EndFunction
 
 Function Report(String asStatus)
 	; Saves report "Saved to ..."; anything else is a problem worth showing.
@@ -359,19 +382,19 @@ EndEvent
 
 Event OnOptionMenuOpen(Int aiOption)
 	If aiOption == oRarity
-		SetMenuDialogOptions(IOD_Native.Choices("rarity"))
+		SetMenuDialogOptions(ListOf("rarity"))
 		SetMenuDialogStartIndex(IOD_Native.GetInt(selected, "rarity"))
 		SetMenuDialogDefaultIndex(0)
 	ElseIf aiOption == oReqType
-		SetMenuDialogOptions(IOD_Native.Choices("reqtype"))
+		SetMenuDialogOptions(ListOf("reqtype"))
 		SetMenuDialogStartIndex(IOD_Native.GetInt(selected, "reqtype"))
 		SetMenuDialogDefaultIndex(0)
 	ElseIf aiOption == oReqSkill
-		SetMenuDialogOptions(IOD_Native.Choices("skills"))
+		SetMenuDialogOptions(ListOf("skills"))
 		SetMenuDialogStartIndex(IOD_Native.GetInt(selected, "reqskill"))
 		SetMenuDialogDefaultIndex(0)
 	ElseIf aiOption == oReqFaction
-		SetMenuDialogOptions(IOD_Native.Choices("factions"))
+		SetMenuDialogOptions(ListOf("factions"))
 		SetMenuDialogStartIndex(IOD_Native.GetInt(selected, "reqfaction"))
 		SetMenuDialogDefaultIndex(0)
 	EndIf
