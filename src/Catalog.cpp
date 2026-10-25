@@ -60,7 +60,10 @@ namespace IOD
 			id = Trim(a_text.substr(0, tilde));
 			plugin = Trim(a_text.substr(tilde + 1));
 		} else {
-			return nullptr;
+			// No plugin: an editor ID, e.g. "MQ202". Quests and a few other records always keep
+			// theirs; other records only with powerofthree's Tweaks.
+			const auto editorID = Trim(a_text);
+			return editorID.empty() ? nullptr : RE::TESForm::LookupByEditorID(editorID);
 		}
 		RE::FormID localID = 0;
 		try {

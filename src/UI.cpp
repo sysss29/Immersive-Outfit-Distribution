@@ -120,7 +120,7 @@ namespace IOD::UI
 		const char* Kind(RE::TESObjectARMO* a_armor)
 		{
 			// What Radiant Raiment thinks of it: that's the only vendor with a restrictive list.
-			return Stocker::CanTradePieces({ a_armor }, RadiantRaimentFaction()) ? "clothing" : "armour";
+			return Stocker::IsClothingLike(a_armor) ? "clothing" : "armour";
 		}
 
 		// --- loaded armour by mod (built once, on first use) ---------------------------------
@@ -633,11 +633,18 @@ namespace IOD::UI
 			}
 			switch (g_draft.reqType) {
 			case kReqLevel:
+				ImGui::SetNextItemWidth(140.0f);
+				g_draft.dirty |= ImGui::InputInt("at least", &g_draft.reqValue, 1, 10);
+				g_draft.reqValue = std::clamp(g_draft.reqValue, 1, 999);
+				break;
 			case kReqHealth:
 			case kReqMagicka:
 			case kReqStamina:
 				ImGui::SetNextItemWidth(140.0f);
-				g_draft.dirty |= ImGui::InputInt("at least", &g_draft.reqValue, 1, 10);
+				if (ImGui::InputInt("at least", &g_draft.reqValue, 50, 100)) {
+					g_draft.reqValue = std::max(0, (g_draft.reqValue + 25) / 50 * 50);  // steps of 50
+					g_draft.dirty = true;
+				}
 				break;
 			case kReqSkill:
 				ImGui::SetNextItemWidth(180.0f);
@@ -656,14 +663,31 @@ namespace IOD::UI
 					if (g_draft.reqFaction == kFactionOther) {
 						g_draft.dirty |= ImGui::InputTextWithHint("Faction form", "Plugin.esp|0x123", g_draft.reqRef, sizeof(g_draft.reqRef));
 					}
+					const char* ref = g_draft.reqFaction == kFactionOther ? g_draft.reqRef : kFactions[static_cast<std::size_t>(g_draft.reqFaction)].ref;
+					auto*       form = LookupFormString(ref);
+					auto*       faction = form ? form->As<RE::TESFaction>() : nullptr;
+					if (!faction) {
+						ImGui::TextColored(kWarn, "No faction found with that form ID.");
+						break;
+					}
+					int ranks = 0;
+					for ([[maybe_unused]] auto* rank : faction->rankData) {
+						++ranks;
+					}
+					const int maxRank = std::max(0, ranks - 1);
 					ImGui::SetNextItemWidth(140.0f);
 					g_draft.dirty |= ImGui::InputInt("rank at least", &g_draft.reqValue, 1, 1);
-					ImGui::TextDisabled("Rank 0 = member. Ranks are faction-specific; untested in game yet.");
+					g_draft.reqValue = std::clamp(g_draft.reqValue, 0, maxRank);
+					if (ranks > 1) {
+						ImGui::TextDisabled("%s has ranks 0 (joined) to %d.", faction->GetName(), maxRank);
+					} else {
+						ImGui::TextDisabled("%s has no rank ladder: rank 0 means you are a member.", faction->GetName());
+					}
 					break;
 				}
 			case kReqQuest:
 				{
-					g_draft.dirty |= ImGui::InputTextWithHint("Quest form", "Plugin.esp|0x123", g_draft.reqRef, sizeof(g_draft.reqRef));
+					g_draft.dirty |= ImGui::InputTextWithHint("Quest form", "MQ202 or Plugin.esp|0x123", g_draft.reqRef, sizeof(g_draft.reqRef));
 					auto* form = LookupFormString(g_draft.reqRef);
 					auto* quest = form ? form->As<RE::TESQuest>() : nullptr;
 					if (quest) {

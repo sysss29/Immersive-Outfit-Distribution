@@ -26,6 +26,7 @@ namespace IOD
 		// True if the vendor's buy/sell list accepts every piece (e.g. Radiant Raiment: clothing
 		// and jewellery only). Read-only, safe from the settings page.
 		static bool CanTradePieces(const std::vector<RE::TESObjectARMO*>& a_pieces, RE::TESFaction* a_faction);
+		static bool IsClothingLike(const RE::TESObjectARMO* a_piece);
 
 		// For the settings page.
 		struct VendorLine
@@ -39,7 +40,9 @@ namespace IOD
 		static void                                          ReloadCatalog();  // game thread
 
 	private:
-		static bool CanTrade(const OutfitSet& a_set, RE::TESFaction* a_faction);
+		static bool            CanTrade(const OutfitSet& a_set, RE::TESFaction* a_faction);
+		static RE::BGSKeyword* VendorTagFor(const RE::BGSListForm* a_list, bool a_clothing);
+		static void            TagClothing();
 		static void SyncBaseContainers();
 		static void PrepareVendor(RE::TESFaction* a_faction, std::string_view a_name);
 		static void RefreshBarterMenu();

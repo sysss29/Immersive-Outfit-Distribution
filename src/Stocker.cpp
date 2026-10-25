@@ -138,12 +138,18 @@ namespace IOD
 			return true;  // no list: the vendor trades anything
 		}
 		const bool excluding = a_faction->vendorData.vendorValues.notBuySell;
+		auto*      clothingTag = VendorTagFor(list, true);
 		for (auto* piece : a_pieces) {
-			auto*      form = piece ? piece->As<RE::BGSKeywordForm>() : nullptr;
-			const bool listed = form && std::ranges::any_of(list->forms, [&](RE::TESForm* a_form) {
-				auto* keyword = a_form ? a_form->As<RE::BGSKeyword>() : nullptr;
-				return keyword && form->HasKeyword(keyword);
-			});
+			auto* form = piece ? piece->As<RE::BGSKeywordForm>() : nullptr;
+			bool  listed = form && std::ranges::any_of(list->forms, [&](RE::TESForm* a_form) {
+                auto* keyword = a_form ? a_form->As<RE::BGSKeyword>() : nullptr;
+                return keyword && form->HasKeyword(keyword);
+            });
+			// Clothing that its author tagged as armour for vendors (common): it gets the clothing
+			// tag at load (TagClothing), so a clothier can sell it.
+			if (!listed && !excluding && clothingTag && IsClothingLike(piece)) {
+				listed = true;
+			}
 			if (listed == excluding) {
 				return false;
 			}
@@ -151,8 +157,67 @@ namespace IOD
 		return true;
 	}
 
+	// Clothing by the game's own classification: armour type "Clothing", or the ArmorClothing /
+	// ArmorJewelry keyword. Light and heavy armour never counts.
+	bool Stocker::IsClothingLike(const RE::TESObjectARMO* a_piece)
+	{
+		if (!a_piece || a_piece->IsLightArmor() || a_piece->IsHeavyArmor()) {
+			return false;
+		}
+		static auto* armorClothing = RE::TESForm::LookupByID<RE::BGSKeyword>(0x06BBE8);
+		static auto* armorJewelry = RE::TESForm::LookupByID<RE::BGSKeyword>(0x06BBE9);
+		return a_piece->IsClothing() || (armorClothing && a_piece->HasKeyword(armorClothing)) || (armorJewelry && a_piece->HasKeyword(armorJewelry));
+	}
+
+	// The clothing (or jewellery) vendor keyword, if this buy/sell list accepts it.
+	RE::BGSKeyword* Stocker::VendorTagFor(const RE::BGSListForm* a_list, bool a_clothing)
+	{
+		static auto* vendorClothing = RE::TESForm::LookupByID<RE::BGSKeyword>(0x08F95B);
+		static auto* vendorJewelry = RE::TESForm::LookupByID<RE::BGSKeyword>(0x08F95A);
+		auto*        tag = a_clothing ? vendorClothing : vendorJewelry;
+		return a_list && tag && a_list->HasForm(tag) ? tag : nullptr;
+	}
+
+	// For sets sold by a clothier: clothing pieces tagged VendorItemArmor by their author get the
+	// vendor's clothing (or jewellery) tag, so the trade window lists them. In memory only.
+	void Stocker::TagClothing()
+	{
+		static auto* armorJewelry = RE::TESForm::LookupByID<RE::BGSKeyword>(0x06BBE9);
+		for (const auto& set : Catalog::GetSingleton().Sets()) {
+			for (const auto source : kAllSources) {
+				if (!set.HasSource(source)) {
+					continue;
+				}
+				for (auto* faction : VendorFactions(source)) {
+					auto* list = faction->vendorData.vendorSellBuyList;
+					if (!list || faction->vendorData.vendorValues.notBuySell || !CanTradePieces(set.pieces, faction)) {
+						continue;
+					}
+					for (auto* piece : set.pieces) {
+						const bool listed = std::ranges::any_of(list->forms, [&](RE::TESForm* a_form) {
+							auto* keyword = a_form ? a_form->As<RE::BGSKeyword>() : nullptr;
+							return keyword && piece->HasKeyword(keyword);
+						});
+						if (listed) {
+							continue;
+						}
+						const bool jewel = armorJewelry && piece->HasKeyword(armorJewelry);
+						auto*      tag = VendorTagFor(list, !jewel);
+						if (!tag) {
+							tag = VendorTagFor(list, jewel);
+						}
+						if (tag && piece->AddKeyword(tag)) {
+							spdlog::info("\"{}\": {} is clothing; tagged so {} can sell it", set.name, piece->GetName(), VendorLabel(faction));
+						}
+					}
+				}
+			}
+		}
+	}
+
 	void Stocker::CheckTradeable()
 	{
+		TagClothing();
 		for (const auto& set : Catalog::GetSingleton().Sets()) {
 			for (const auto source : kAllSources) {
 				if (!set.HasSource(source)) {
