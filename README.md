@@ -32,6 +32,9 @@ Every `*.json` file in `SKSE/Plugins/ImmersiveOutfitDistribution/` is read at ga
 `config/MyOutfits.json` for the format and all options. An in-game configuration screen comes in
 milestone 2.
 
+Release zips contain only the plugin, never a set file, so installing an update over the
+existing mod (MO2: Merge) keeps your sets.
+
 The log is `Documents/My Games/Skyrim Special Edition/SKSE/ImmersiveOutfitDistribution.log`.
 
 ## Build

@@ -76,13 +76,13 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $plugins = New-Item -ItemType Directory -Force -Path package/SKSE/Plugins
-          $sets = New-Item -ItemType Directory -Force -Path package/SKSE/Plugins/ImmersiveOutfitDistribution
           $dll = Get-ChildItem -Recurse -Path build/release-msvc -Filter ImmersiveOutfitDistribution.dll | Select-Object -First 1
           if (-not $dll) { throw "DLL not found" }
           Copy-Item $dll.FullName $plugins
           $pdb = Get-ChildItem -Recurse -Path build/release-msvc -Filter ImmersiveOutfitDistribution.pdb | Select-Object -First 1
           if ($pdb) { Copy-Item $pdb.FullName $plugins }
-          Copy-Item config/*.json $sets
+          # The set list is the user's own file: updates never ship one, so installing (Merge in
+          # MO2) only replaces the plugin. The example stays in the repo (config/MyOutfits.json).
           Copy-Item README.md package/README-ImmersiveOutfitDistribution.md
           Get-ChildItem -Recurse package | ForEach-Object { $_.FullName }
 
