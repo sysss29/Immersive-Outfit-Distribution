@@ -422,25 +422,25 @@ namespace IOD
 			return;
 		}
 		auto&              state = State::Get();
-		std::optional<int> near;
+		std::optional<int> found;
 		tes->ForEachReferenceInRange(player, 1200.0f, [&](RE::TESObjectREFR* a_ref) {
 			const auto* base = a_ref ? a_ref->GetBaseObject() : nullptr;
 			if (base && _statues.contains(base->GetFormID()) && !a_ref->IsDisabled()) {
 				const int god = _byBase.at(base->GetFormID());
 				if (!state.noticed.contains(god)) {
-					near = god;
+					found = god;
 					return RE::BSContainer::ForEachResult::kStop;
 				}
 			}
 			return RE::BSContainer::ForEachResult::kContinue;
 		});
-		if (!near) {
+		if (!found) {
 			return;
 		}
-		const bool hasSets = std::ranges::any_of(Catalog::GetSingleton().Sets(), [&](const OutfitSet& a_set) { return a_set.HasGod(*near); });
+		const bool hasSets = std::ranges::any_of(Catalog::GetSingleton().Sets(), [&](const OutfitSet& a_set) { return a_set.HasGod(*found); });
 		if (hasSets) {
-			state.noticed.insert(*near);
-			Notify(fmt::format("The statue of {} seems to watch you.", GodName(*near)));
+			state.noticed.insert(*found);
+			Notify(fmt::format("The statue of {} seems to watch you.", GodName(*found)));
 		}
 	}
 
