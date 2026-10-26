@@ -7,6 +7,7 @@
 #include "Shrines.h"
 #include "Sources.h"
 #include "Stocker.h"
+#include "TryOn.h"
 
 #ifndef WIN32_LEAN_AND_MEAN
 #	define WIN32_LEAN_AND_MEAN
@@ -884,6 +885,256 @@ namespace IOD::UI
 			ImGui::TextDisabled("The Thieves Guild fences outside Riften only trade once their quests are done.");
 		}
 
+		// --- triage: try outfits on, keep or skip ---------------------------------------------
+
+		MENU_WINDOW g_triageWindow = nullptr;
+		int         g_triageMod = -1;
+		char        g_triageFilter[64]{};
+		Picker      g_triagePicker;
+		char        g_triageName[128]{};
+		std::string g_triageStatus;
+		bool        g_triageWasOpen = false;
+		bool        g_hideReviewed = false;
+
+		bool IsKept(const std::string& a_outfitRef)
+		{
+			for (auto& file : SetFiles::Get().Files()) {
+				for (const auto& set : file.Sets()) {
+					if (set.value("outfit", "") == a_outfitRef) {
+						return true;
+					}
+				}
+			}
+			return false;
+		}
+
+		void WearLater(std::vector<RE::TESObjectARMO*> a_pieces)
+		{
+			SKSE::GetTaskInterface()->AddTask([pieces = std::move(a_pieces)]() { TryOn::Wear(pieces); });
+		}
+
+		void TakeOffLater()
+		{
+			SKSE::GetTaskInterface()->AddTask([]() { TryOn::TakeOff(); });
+		}
+
+		void __stdcall RenderTriageWindow()
+		{
+			std::scoped_lock lock(Lock());
+			auto&            progress = Triage::Progress::Get();
+			BuildModIndex();
+
+			auto* viewport = ImGui::GetMainViewport();
+			ImGui::SetNextWindowPos(ImGui::ImVec2{ viewport->Pos.x + 20.0f, viewport->Pos.y + 20.0f }, ImGui::ImGuiCond_Appearing, ImGui::ImVec2{ 0.0f, 0.0f });
+			ImGui::SetNextWindowSize(ImGui::ImVec2{ viewport->Size.x * 0.38f, viewport->Size.y * 0.85f }, ImGui::ImGuiCond_Appearing);
+			bool open = true;
+			ImGui::Begin("Outfit triage##ImmersiveOutfitDistribution", &open, ImGui::ImGuiWindowFlags_NoCollapse);
+
+			std::size_t reviewed = 0;
+			for (const auto& mod : g_mods) {
+				reviewed += progress.reviewed.contains(mod.file) ? 1 : 0;
+			}
+			ImGui::Text("Reviewed %zu of %zu armour mods", reviewed, g_mods.size());
+			ImGui::TextDisabled("The game keeps running: your character wears what you try on.");
+			if (ImGui::Button("Turn left")) {
+				SKSE::GetTaskInterface()->AddTask([]() { TryOn::TurnPlayer(-60.0f); });
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Turn right")) {
+				SKSE::GetTaskInterface()->AddTask([]() { TryOn::TurnPlayer(60.0f); });
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Take it off")) {
+				TakeOffLater();
+			}
+
+			// Mod list: not yet reviewed first
+			ImGui::Checkbox("Hide reviewed mods", &g_hideReviewed);
+			ImGui::SameLine();
+			ImGui::SetNextItemWidth(200.0f);
+			ImGui::InputTextWithHint("##triagefilter", "Filter mods", g_triageFilter, sizeof(g_triageFilter));
+			std::vector<int> order;
+			for (int i = 0; i < static_cast<int>(g_mods.size()); ++i) {
+				const auto& mod = g_mods[static_cast<std::size_t>(i)];
+				if (Contains(mod.file, g_triageFilter) && !(g_hideReviewed && progress.reviewed.contains(mod.file))) {
+					order.push_back(i);
+				}
+			}
+			std::ranges::stable_sort(order, [&](int a, int b) {
+				return !progress.reviewed.contains(g_mods[static_cast<std::size_t>(a)].file) && progress.reviewed.contains(g_mods[static_cast<std::size_t>(b)].file);
+			});
+			if (ImGui::BeginListBox("##triagemods", ImGui::ImVec2{ -1.0f, 150.0f })) {
+				for (const int i : order) {
+					const auto& mod = g_mods[static_cast<std::size_t>(i)];
+					const bool  done = progress.reviewed.contains(mod.file);
+					const auto  label = fmt::format("{}{}  ({} outfits, {} pieces)##m{}", done ? "[done] " : "", mod.file, mod.outfits.size(), mod.armour.size(), i);
+					if (ImGui::Selectable(label.c_str(), i == g_triageMod)) {
+						g_triageMod = i;
+						g_triagePicker = Picker{};
+						g_triagePicker.mod = i;
+						g_triageStatus.clear();
+					}
+				}
+				ImGui::EndListBox();
+			}
+
+			if (g_triageMod >= 0 && g_triageMod < static_cast<int>(g_mods.size())) {
+				const auto& mod = g_mods[static_cast<std::size_t>(g_triageMod)];
+				ImGui::SeparatorText(mod.file.c_str());
+				bool allDecided = true;
+				int  shown = 0;
+				if (!mod.outfits.empty()) {
+					const int flags = ImGui::ImGuiTableFlags_RowBg | ImGui::ImGuiTableFlags_ScrollY | ImGui::ImGuiTableFlags_BordersInnerH;
+					if (ImGui::BeginTable("triageoutfits", 3, flags, ImGui::ImVec2{ 0.0f, viewport->Size.y * 0.35f })) {
+						ImGui::TableSetupColumn("Outfit", ImGui::ImGuiTableColumnFlags_WidthStretch);
+						ImGui::TableSetupColumn("Status", ImGui::ImGuiTableColumnFlags_WidthFixed, 70.0f);
+						ImGui::TableSetupColumn("", ImGui::ImGuiTableColumnFlags_WidthFixed, 170.0f);
+						for (auto* outfit : mod.outfits) {
+							const auto pieces = OutfitPieces(outfit);
+							if (pieces.empty()) {
+								continue;
+							}
+							++shown;
+							const auto ref = FormString(outfit);
+							const bool kept = IsKept(ref);
+							const bool skipped = progress.skipped.contains(ref);
+							allDecided = allDecided && (kept || skipped);
+							ImGui::PushID(outfit);
+							ImGui::TableNextRow();
+							ImGui::TableNextColumn();
+							ImGui::Text("%s  (%zu)", OutfitLabel(outfit).c_str(), pieces.size());
+							if (ImGui::IsItemHovered()) {
+								std::string names;
+								for (auto* armor : pieces) {
+									names += std::string(armor->GetName()) + "  [" + Slots(armor) + "]\n";
+								}
+								ImGui::SetTooltip("%s", names.c_str());
+							}
+							ImGui::TableNextColumn();
+							if (kept) {
+								ImGui::TextColored(kGood, "kept");
+							} else if (skipped) {
+								ImGui::TextColored(kDim, "skipped");
+							} else {
+								ImGui::TextDisabled("-");
+							}
+							ImGui::TableNextColumn();
+							if (ImGui::SmallButton("Try on")) {
+								WearLater(pieces);
+							}
+							ImGui::SameLine();
+							ImGui::BeginDisabled(kept);
+							if (ImGui::SmallButton("Keep")) {
+								ImportOutfits({ outfit }, g_triageStatus);
+								progress.skipped.erase(ref);
+								progress.Save();
+							}
+							ImGui::EndDisabled();
+							ImGui::SameLine();
+							ImGui::BeginDisabled(kept || skipped);
+							if (ImGui::SmallButton("Skip")) {
+								progress.skipped.insert(ref);
+								progress.Save();
+							}
+							ImGui::EndDisabled();
+							ImGui::PopID();
+						}
+						ImGui::EndTable();
+					}
+				}
+				if (mod.outfits.empty() || shown == 0) {
+					// No outfit records: pick pieces, try them on, keep them as a set.
+					allDecided = false;
+					ImGui::TextWrapped("This mod has no ready-made outfits. Tick pieces, try them on, and keep them as a set.");
+					PieceList(g_triagePicker, viewport->Size.y * 0.3f);
+					ImGui::BeginDisabled(g_triagePicker.chosen.empty());
+					if (ImGui::Button("Try on the ticked pieces")) {
+						WearLater(g_triagePicker.chosen);
+					}
+					ImGui::SameLine();
+					ImGui::SetNextItemWidth(180.0f);
+					ImGui::InputTextWithHint("##triagename", "Set name", g_triageName, sizeof(g_triageName));
+					ImGui::SameLine();
+					ImGui::BeginDisabled(g_triageName[0] == '\0');
+					if (ImGui::Button("Keep as a set")) {
+						std::vector<std::string> refs;
+						for (auto* armor : g_triagePicker.chosen) {
+							refs.push_back(FormString(armor));
+						}
+						Draft d;
+						NewDraft(d, g_triageName, {}, std::move(refs));
+						if (SaveDraft(d)) {
+							g_triageStatus = fmt::format("Kept \"{}\" in {}.json.", g_triageName, SetFiles::Get().Files()[d.file].stem);
+							g_triageName[0] = '\0';
+							g_triagePicker.chosen.clear();
+						} else {
+							g_triageStatus = d.status;
+						}
+					}
+					ImGui::EndDisabled();
+					ImGui::EndDisabled();
+				}
+				if (!g_triageStatus.empty()) {
+					ImGui::TextWrapped("%s", g_triageStatus.c_str());
+				}
+				const bool done = progress.reviewed.contains(mod.file);
+				if (!done && allDecided) {
+					progress.reviewed.insert(mod.file);  // every outfit kept or skipped
+					progress.Save();
+				}
+				if (ImGui::Button(done ? "Mark as not reviewed" : "Mark mod as reviewed")) {
+					if (done) {
+						progress.reviewed.erase(mod.file);
+					} else {
+						progress.reviewed.insert(mod.file);
+					}
+					progress.Save();
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Next mod")) {
+					TakeOffLater();
+					for (const int i : order) {
+						if (i != g_triageMod && !progress.reviewed.contains(g_mods[static_cast<std::size_t>(i)].file)) {
+							g_triageMod = i;
+							g_triagePicker = Picker{};
+							g_triagePicker.mod = i;
+							g_triageStatus.clear();
+							break;
+						}
+					}
+				}
+			}
+			ImGui::End();
+
+			if (!open) {
+				g_triageWindow->IsOpen = false;
+			}
+		}
+
+		// Runs every frame: when the window closes, the try-on ends.
+		void __stdcall TriageWatcher()
+		{
+			const bool openNow = g_triageWindow && g_triageWindow->IsOpen;
+			if (g_triageWasOpen && !openNow) {
+				TakeOffLater();
+			}
+			g_triageWasOpen = openNow;
+		}
+
+		void __stdcall RenderTriage()
+		{
+			ImGui::TextWrapped("Go through your armour mods one by one: try each outfit on your character, then keep it (it becomes a set in that mod's file, using the mod's defaults) or skip it. Progress is remembered.");
+			ImGui::TextWrapped("The try-on window doesn't pause the game. Stand somewhere quiet and well lit. Whatever you try on is taken off again, and lent pieces are removed, when you close the window or press Take it off.");
+			ImGui::TextColored(kWarn, "Don't save while trying something on.");
+			if (ImGui::Button("Open the try-on window")) {
+				if (g_triageWindow) {
+					g_triageWindow->IsOpen = true;
+				}
+			}
+			ImGui::SameLine();
+			ImGui::TextDisabled("then close this menu (F1)");
+		}
+
 		std::string g_settingsStatus;
 
 		void __stdcall RenderSettings()
@@ -917,6 +1168,10 @@ namespace IOD::UI
 		SKSEMenuFramework::AddSectionItem("Sets", RenderSets);
 		SKSEMenuFramework::AddSectionItem("New set", RenderNewSet);
 		SKSEMenuFramework::AddSectionItem("Mod defaults", RenderDefaults);
+		SKSEMenuFramework::AddSectionItem("Triage", RenderTriage);
+		g_triageWindow = SKSEMenuFramework::AddWindow(RenderTriageWindow, false);
+		SKSEMenuFramework::AddHudElement(TriageWatcher);
+		Triage::Progress::Get().Load();
 		SKSEMenuFramework::AddSectionItem("Vendors", RenderVendors);
 		SKSEMenuFramework::AddSectionItem("Settings", RenderSettings);
 		spdlog::info("Settings page registered with SKSE Menu Framework");

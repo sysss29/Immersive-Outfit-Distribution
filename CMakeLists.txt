@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.21)
 
 project(
     ImmersiveOutfitDistribution
-    VERSION 0.7.0
+    VERSION 0.8.0
     DESCRIPTION "Immersive Outfit Distribution: curated outfits sold by Skyrim vendors and granted at shrines."
     LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
@@ -37,6 +37,7 @@ set(sources
     src/Papyrus.cpp
     src/Gods.cpp
     src/Shrines.cpp
+    src/TryOn.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/version.rc)
 
 set(headers
@@ -53,6 +54,7 @@ set(headers
     src/Papyrus.h
     src/Gods.h
     src/Shrines.h
+    src/TryOn.h
     include/SKSEMenuFramework.h)
 
 add_commonlibsse_plugin(${PROJECT_NAME}
