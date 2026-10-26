@@ -179,7 +179,8 @@ namespace IOD::Papyrus
 			std::vector<String> out;
 			auto&               files = SetFiles::Get().Files();
 			for (const auto& [f, i] : AllSets()) {
-				out.emplace_back(Safe(StatusOf(files[f].Sets()[i])));
+				const auto defaults = files[f].root.contains("defaults") ? files[f].root["defaults"] : nlohmann::json{};
+				out.emplace_back(Safe(StatusOf(Effective(defaults, files[f].Sets()[i], nullptr))));
 			}
 			return out;
 		}
@@ -223,6 +224,10 @@ namespace IOD::Papyrus
 				d.hasPrice = a_value;
 			} else if (field.starts_with("src")) {
 				d.sources[static_cast<std::size_t>(SourceOf(field))] = a_value;
+				d.inherit[kInheritSources] = false;
+			}
+			if (field == "hasprice") {
+				d.inherit[kInheritPrice] = false;
 			}
 			SaveDraft(d);
 			spdlog::info("MCM: set {} {} = {} ({})", a_index, field, a_value, d.status);
@@ -335,6 +340,15 @@ namespace IOD::Papyrus
 				d.reqFaction = std::clamp(a_value, 0, kFactionOther);
 				d.reqValue = std::clamp(d.reqValue, 0, std::max(0, MaxFactionRank(d)));
 			}
+			if (field == "rarity") {
+				d.inherit[kInheritRarity] = false;
+			} else if (field == "price") {
+				d.inherit[kInheritPrice] = false;
+			} else if (field == "togglegod" || field == "god") {
+				d.inherit[kInheritSources] = false;
+			} else if (field.starts_with("req")) {
+				d.inherit[kInheritRequirement] = false;
+			}
 			SaveDraft(d);
 			spdlog::info("MCM: set {} {} = {} ({})", a_index, field, a_value, d.status);
 			return Safe(d.status);
@@ -380,6 +394,16 @@ namespace IOD::Papyrus
 				}
 				return Safe(text);
 			}
+			if (field == "inherited") {  // which fields come from the mod's defaults, e.g. "where sold, rarity"
+				std::string text;
+				constexpr std::array kNames{ "where sold", "rarity", "price", "requirement" };
+				for (int f = 0; f < kInheritCount; ++f) {
+					if (d.inherit[static_cast<std::size_t>(f)]) {
+						text += (text.empty() ? "" : ", ") + std::string(kNames[static_cast<std::size_t>(f)]);
+					}
+				}
+				return text;
+			}
 			if (field == "shrines") {  // "Mara, Sanguine" or "none"
 				std::string text;
 				for (std::size_t g = 0; g < kGods.size(); ++g) {
@@ -415,6 +439,9 @@ namespace IOD::Papyrus
 				CopyTo(d.reqRef, a_value.c_str());
 			} else if (field == "name") {
 				CopyTo(d.name, a_value.c_str());
+			}
+			if (field == "reqref") {
+				d.inherit[kInheritRequirement] = false;
 			}
 			SaveDraft(d);
 			return Safe(d.status);

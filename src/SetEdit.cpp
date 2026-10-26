@@ -96,6 +96,171 @@ namespace IOD::Edit
 		return offering.empty() ? std::string("no offering defined") : DescribeOffering(offering);
 	}
 
+	bool FileHasDefault(std::size_t a_file, Inherit a_field)
+	{
+		auto& files = SetFiles::Get().Files();
+		if (a_file >= files.size() || !files[a_file].root.contains("defaults")) {
+			return false;
+		}
+		const auto& d = files[a_file].root["defaults"];
+		switch (a_field) {
+		case kInheritSources:
+			return d.contains("sources");
+		case kInheritRarity:
+			return d.contains("rarity");
+		case kInheritPrice:
+			return d.contains("price") || d.contains("priceByRarity");
+		case kInheritRequirement:
+			return d.contains("requirement");
+		default:
+			return false;
+		}
+	}
+
+	void UseDefault(Draft& a_draft, Inherit a_field)
+	{
+		a_draft.inherit[a_field] = true;
+		const auto raw = DraftToJson(a_draft);
+		const auto status = a_draft.status;
+		LoadDraftFrom(a_draft, a_draft.file, a_draft.index, raw);
+		a_draft.status = status;
+		a_draft.dirty = true;
+	}
+
+	void LoadDefaults(Draft& a_draft, std::size_t a_file)
+	{
+		auto&      files = SetFiles::Get().Files();
+		const auto defaults = files[a_file].root.contains("defaults") ? files[a_file].root["defaults"] : nlohmann::json::object();
+		a_draft = Draft{};
+		a_draft.active = true;
+		a_draft.isDefaults = true;
+		a_draft.file = a_file;
+		a_draft.index = SIZE_MAX;
+		a_draft.original = nlohmann::json::object();
+		ParseInto(a_draft, defaults);
+		CopyTo(a_draft.name, files[a_file].stem);
+		if (defaults.contains("priceByRarity") && defaults["priceByRarity"].is_object()) {
+			a_draft.hasPrice = true;
+			for (int r = 0; r < 3; ++r) {
+				a_draft.priceByRarity[static_cast<std::size_t>(r)] = defaults["priceByRarity"].value(kRarities[static_cast<std::size_t>(r)], a_draft.priceByRarity[static_cast<std::size_t>(r)]);
+			}
+		}
+	}
+
+	bool SaveDefaults(Draft& a_draft)
+	{
+		auto& store = SetFiles::Get();
+		auto& file = store.Files()[a_draft.file];
+		auto  full = DraftToJson(a_draft);
+		nlohmann::json defaults = nlohmann::json::object();
+		if (full.contains("sources") && !full["sources"].empty()) {
+			defaults["sources"] = full["sources"];
+		}
+		defaults["rarity"] = full.value("rarity", "Common");
+		if (a_draft.hasPrice) {
+			defaults["priceByRarity"] = { { "Common", std::max(0, a_draft.priceByRarity[0]) }, { "Rare", std::max(0, a_draft.priceByRarity[1]) },
+				{ "Legendary", std::max(0, a_draft.priceByRarity[2]) } };
+		}
+		if (full.contains("requirement")) {
+			defaults["requirement"] = full["requirement"];
+		}
+		file.root["defaults"] = defaults;
+		if (!store.Save(a_draft.file)) {
+			a_draft.status = "Could not save; see ImmersiveOutfitDistribution.log.";
+			return false;
+		}
+		a_draft.dirty = false;
+		a_draft.status = fmt::format("Defaults saved to {}.json: every set of this mod that doesn't set a field itself uses them.", file.stem);
+		ApplyChanges();
+		return true;
+	}
+
+	namespace
+	{
+		// "Brutal Ravager Bra", "Brutal Ravager Boots" -> "Brutal Ravager"
+		std::string CommonName(const std::vector<RE::TESObjectARMO*>& a_pieces)
+		{
+			std::vector<std::string> words;
+			bool                     first = true;
+			for (auto* piece : a_pieces) {
+				std::vector<std::string> mine;
+				std::string              word;
+				for (char c : std::string(piece->GetName()) + " ") {
+					if (c == ' ') {
+						if (!word.empty()) {
+							mine.push_back(word);
+						}
+						word.clear();
+					} else {
+						word.push_back(c);
+					}
+				}
+				if (first) {
+					words = mine;
+					first = false;
+				} else {
+					std::size_t n = 0;
+					while (n < words.size() && n < mine.size() && words[n] == mine[n]) {
+						++n;
+					}
+					words.resize(n);
+				}
+			}
+			std::string name;
+			for (const auto& w : words) {
+				name += (name.empty() ? "" : " ") + w;
+			}
+			return name;
+		}
+	}
+
+	std::size_t ImportOutfits(const std::vector<RE::BGSOutfit*>& a_outfits, std::string& a_status)
+	{
+		auto&                 store = SetFiles::Get();
+		std::size_t           made = 0;
+		std::size_t           skipped = 0;
+		std::set<std::size_t> touched;
+		for (auto* outfit : a_outfits) {
+			const auto pieces = OutfitPieces(outfit);
+			const auto* plugin = outfit ? outfit->GetFile(0) : nullptr;
+			if (pieces.empty() || !plugin) {
+				continue;
+			}
+			const auto f = store.FileFor(SetFiles::StemForPlugin(plugin->GetFilename()));
+			auto&      file = store.Files()[f];
+			const auto ref = FormString(outfit);
+			auto       name = CommonName(pieces);
+			if (name.size() < 3) {
+				name = OutfitLabel(outfit);
+			}
+			auto& sets = file.Sets();
+			if (std::ranges::any_of(sets, [&](const nlohmann::json& a_set) { return a_set.value("outfit", "") == ref; })) {
+				++skipped;
+				continue;
+			}
+			for (int n = 2; std::ranges::any_of(sets, [&](const nlohmann::json& a_set) { return a_set.value("name", "") == name; }); ++n) {
+				name = fmt::format("{} {}", CommonName(pieces).empty() ? OutfitLabel(outfit) : CommonName(pieces), n);
+			}
+			if (!file.root.contains("defaults")) {
+				const bool clothing = TradeCount(pieces, Source::RadiantRaiment).first > 0;
+				file.root["defaults"] = { { "sources", clothing ? nlohmann::json::array({ "Radiant Raiment" }) : nlohmann::json::array({ "Khajiit caravans", "Thieves Guild" }) },
+					{ "rarity", "Common" } };
+			}
+			sets.push_back({ { "name", name }, { "id", SetFiles::NewId() }, { "outfit", ref } });
+			touched.insert(f);
+			++made;
+		}
+		for (const auto f : touched) {
+			store.Save(f);
+		}
+		if (made > 0) {
+			ApplyChanges();
+		}
+		a_status = fmt::format("Made {} set(s){}. They use the mod's defaults: set those under \"Mod defaults\".", made,
+			skipped ? fmt::format(", {} already existed", skipped) : std::string{});
+		return made;
+	}
+
 	std::string ModStemOf(const Draft& a_draft)
 	{
 		const auto resolved = Resolve(a_draft.outfit, a_draft.pieces);
@@ -336,15 +501,65 @@ namespace IOD::Edit
 		return {};
 	}
 
+	nlohmann::json Effective(const nlohmann::json& a_defaults, const nlohmann::json& a_entry, std::array<bool, kInheritCount>* a_inherited)
+	{
+		nlohmann::json effective = a_entry.is_object() ? a_entry : nlohmann::json::object();
+		if (a_inherited) {
+			a_inherited->fill(false);
+		}
+		if (!a_defaults.is_object()) {
+			return effective;
+		}
+		for (const auto& [field, key] : { std::pair{ kInheritSources, "sources" }, std::pair{ kInheritRarity, "rarity" }, std::pair{ kInheritRequirement, "requirement" } }) {
+			if (!effective.contains(key) && a_defaults.contains(key)) {
+				effective[key] = a_defaults[key];
+				if (a_inherited) {
+					(*a_inherited)[field] = true;
+				}
+			}
+		}
+		if (!effective.contains("price")) {
+			const auto rarity = effective.value("rarity", "Common");
+			if (a_defaults.contains("priceByRarity") && a_defaults["priceByRarity"].is_object()) {
+				for (const auto& [name, value] : a_defaults["priceByRarity"].items()) {
+					if (Normalise(name) == Normalise(rarity) && value.is_number_integer()) {
+						effective["price"] = value;
+					}
+				}
+			}
+			if (!effective.contains("price") && a_defaults.contains("price")) {
+				effective["price"] = a_defaults["price"];
+			}
+			if (effective.contains("price") && a_inherited) {
+				(*a_inherited)[kInheritPrice] = true;
+			}
+		}
+		return effective;
+	}
+
 	void LoadDraft(Draft& a_draft, std::size_t a_file, std::size_t a_index)
 	{
 		auto& files = SetFiles::Get().Files();
-		const auto& entry = files[a_file].Sets()[a_index];
+		LoadDraftFrom(a_draft, a_file, a_index, files[a_file].Sets()[a_index]);
+	}
+
+	void LoadDraftFrom(Draft& a_draft, std::size_t a_file, std::size_t a_index, const nlohmann::json& a_raw)
+	{
+		auto&      files = SetFiles::Get().Files();
+		const auto defaults = files[a_file].root.contains("defaults") ? files[a_file].root["defaults"] : nlohmann::json{};
+		std::array<bool, kInheritCount> inherited{};
+		const auto entry = Effective(defaults, a_raw, &inherited);
 		a_draft = Draft{};
 		a_draft.active = true;
 		a_draft.file = a_file;
 		a_draft.index = a_index;
-		a_draft.original = entry;
+		a_draft.original = a_raw;
+		a_draft.inherit = inherited;
+		ParseInto(a_draft, entry);
+	}
+
+	void ParseInto(Draft& a_draft, const nlohmann::json& entry)
+	{
 		CopyTo(a_draft.name, entry.value("name", ""));
 		a_draft.enabled = entry.value("enabled", true);
 		a_draft.unique = entry.value("unique", true);
@@ -465,6 +680,17 @@ namespace IOD::Edit
 			a_draft.sources[static_cast<std::size_t>(Source::KhajiitCaravans)] = true;
 			a_draft.sources[static_cast<std::size_t>(Source::ThievesGuild)] = true;
 		}
+		// A mod file with defaults: the new set takes them, like an imported one.
+		if (files.Files()[a_draft.file].root.contains("defaults")) {
+			nlohmann::json raw{ { "name", std::string(a_draft.name) }, { "id", a_draft.original["id"] } };
+			if (!a_draft.outfit.empty()) {
+				raw["outfit"] = a_draft.outfit;
+			}
+			if (!a_draft.pieces.empty()) {
+				raw["pieces"] = a_draft.pieces;
+			}
+			LoadDraftFrom(a_draft, a_draft.file, SIZE_MAX, raw);
+		}
 		a_draft.dirty = true;
 	}
 
@@ -548,6 +774,19 @@ namespace IOD::Edit
 		if (!a_draft.unique) {
 			entry["unique"] = false;
 		}
+		// Fields the set takes from its mod's defaults stay out of the entry.
+		if (a_draft.inherit[kInheritSources]) {
+			entry.erase("sources");
+		}
+		if (a_draft.inherit[kInheritRarity]) {
+			entry.erase("rarity");
+		}
+		if (a_draft.inherit[kInheritPrice]) {
+			entry.erase("price");
+		}
+		if (a_draft.inherit[kInheritRequirement]) {
+			entry.erase("requirement");
+		}
 		return entry;
 	}
 
@@ -559,6 +798,9 @@ namespace IOD::Edit
 
 	bool SaveDraft(Draft& a_draft)
 	{
+		if (a_draft.isDefaults) {
+			return SaveDefaults(a_draft);
+		}
 		auto& store = SetFiles::Get();
 		auto& file = store.Files()[a_draft.file];
 		auto& sets = file.Sets();

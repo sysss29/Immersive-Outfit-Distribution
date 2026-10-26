@@ -34,6 +34,10 @@ namespace IOD
 //   offering     optional, for shrines: [{"item": "Skyrim.esm|0xF", "count": 250}, ...]; an item can be a
 //                list of alternatives. Default: the god's offering for the set's rarity (Shrines/Shrines.json)
 //   unique       true (default): leaves rotation once you own every piece
+//
+// File level (optional), "defaults": what every set in the file uses unless it sets the field itself:
+//   {"sources": [...], "rarity": "Rare", "priceByRarity": {"Common": 1000, "Rare": 2500, "Legendary": 6000},
+//    "requirement": {...}}       (F1: Mod defaults)
 //   enabled      true (default)
 )";
 
@@ -209,7 +213,11 @@ namespace IOD
 		}
 		const auto& file = _files[a_file];
 		std::string text{ kHeader };
-		text += "{\n  \"sets\": [";
+		text += "{\n";
+		if (file.root.contains("defaults") && file.root["defaults"].is_object()) {
+			text += "  \"defaults\": " + Dump(file.root["defaults"]) + ",\n";
+		}
+		text += "  \"sets\": [";
 		const auto& sets = file.Sets();
 		for (std::size_t i = 0; i < sets.size(); ++i) {
 			text += (i == 0 ? "\n" : ",\n") + WriteSet(sets[i]);

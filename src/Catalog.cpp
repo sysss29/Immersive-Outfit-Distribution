@@ -1,6 +1,7 @@
 #include "Catalog.h"
 
 #include "Gods.h"
+#include "SetEdit.h"
 
 namespace IOD
 {
@@ -197,8 +198,10 @@ namespace IOD
 			return;
 		}
 
-		for (const auto& entry : root["sets"]) {
-			OutfitSet set;
+		const auto defaults = root.contains("defaults") ? root["defaults"] : nlohmann::json{};
+		for (const auto& raw : root["sets"]) {
+			const auto entry = Edit::Effective(defaults, raw, nullptr);  // fields from the mod's defaults
+			OutfitSet  set;
 			set.name = entry.value("name", "");
 			if (set.name.empty()) {
 				spdlog::warn("{}: a set without a name was skipped", stem);

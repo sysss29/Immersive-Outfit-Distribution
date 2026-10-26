@@ -49,6 +49,16 @@ namespace IOD::Edit
 
 	// Quest milestones offered in the Quest completed list (editor IDs checked against Skyrim.esm);
 	// the label shown adds the quest's in-game name.
+	// Fields a set can take from its mod file's "defaults".
+	enum Inherit : int
+	{
+		kInheritSources,  // where sold and shrines
+		kInheritRarity,
+		kInheritPrice,
+		kInheritRequirement,
+		kInheritCount
+	};
+
 	struct KnownQuest
 	{
 		const char* label;
@@ -113,6 +123,9 @@ namespace IOD::Edit
 		int                      reqQuest{ 0 };
 		int                      reqPerk{ 0 };  // index in PerksOfTree(reqSkill); -1: other (reqRef)
 		char                     reqRef[128]{};
+		std::array<bool, kInheritCount> inherit{};  // true: the value shown comes from the mod defaults
+		bool                     isDefaults{ false };  // editing a file's defaults, not a set
+		std::array<int, 3>       priceByRarity{ 1000, 2500, 6000 };  // defaults only
 		bool                     dirty{ false };
 		bool                     confirmDelete{ false };
 		std::string              status;  // last save result
@@ -143,6 +156,19 @@ namespace IOD::Edit
 	RE::BGSPerk*   DraftPerk(const Draft& a_draft);  // the chosen perk, or null
 	std::string    OfferingText(const Draft& a_draft, int a_god);  // what this god asks for the set
 	void           LoadDraft(Draft& a_draft, std::size_t a_file, std::size_t a_index);
+	void           LoadDraftFrom(Draft& a_draft, std::size_t a_file, std::size_t a_index, const nlohmann::json& a_raw);
+	void           ParseInto(Draft& a_draft, const nlohmann::json& a_entry);
+	nlohmann::json Effective(const nlohmann::json& a_defaults, const nlohmann::json& a_entry, std::array<bool, kInheritCount>* a_inherited);
+	void           UseDefault(Draft& a_draft, Inherit a_field);  // back to the mod's default for that field
+	bool           FileHasDefault(std::size_t a_file, Inherit a_field);
+
+	// A file's defaults, edited like a set (isDefaults).
+	void           LoadDefaults(Draft& a_draft, std::size_t a_file);
+	bool           SaveDefaults(Draft& a_draft);
+
+	// One set per outfit record of the mod, into the mod's file; sets that exist are skipped.
+	// Gives the file defaults if it has none (sold by kind, Common). Returns how many were made.
+	std::size_t    ImportOutfits(const std::vector<RE::BGSOutfit*>& a_outfits, std::string& a_status);
 	void           NewDraft(Draft& a_draft, std::string a_name, std::string a_outfit, std::vector<std::string> a_pieces);
 	nlohmann::json DraftToJson(Draft& a_draft);
 	bool           SaveDraft(Draft& a_draft);  // writes the file and reloads the catalog in game

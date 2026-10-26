@@ -163,21 +163,44 @@ namespace IOD::UI
 		std::string g_splitStatus;
 		Picker g_addPicker;  // "Add pieces" inside the editor
 
-		void RenderEditor()
+		// "(mod default)" when the field comes from the mod's defaults, or a button to go back to it.
+		void InheritTag(Draft& d, Inherit a_field)
+		{
+			if (d.isDefaults) {
+				return;
+			}
+			ImGui::SameLine();
+			if (d.inherit[a_field]) {
+				ImGui::TextColored(kDim, "(mod default)");
+			} else if (FileHasDefault(d.file, a_field)) {
+				ImGui::PushID(3000 + a_field);
+				if (ImGui::SmallButton("Use mod default")) {
+					UseDefault(d, a_field);
+				}
+				ImGui::PopID();
+			}
+		}
+
+		void RenderEditor(Draft& d)
 		{
 			auto& store = SetFiles::Get();
-			auto& file = store.Files()[g_draft.file];
+			auto& file = store.Files()[d.file];
 			ImGui::Spacing();
-			ImGui::SeparatorText(g_draft.index == SIZE_MAX ? "New set (not saved yet)" : "Edit set");
-			ImGui::TextDisabled("File: %s.json", file.stem.c_str());
-			if (const auto modStem = ModStemOf(g_draft); modStem != file.stem && modStem != "MyOutfits") {
+			if (d.isDefaults) {
+				ImGui::SeparatorText(fmt::format("Defaults for {}.json", file.stem).c_str());
+				ImGui::TextWrapped("Every set in this file that doesn't set a field itself uses these. Change them here and all of the mod's sets follow.");
+			} else {
+				ImGui::SeparatorText(d.index == SIZE_MAX ? "New set (not saved yet)" : "Edit set");
+				ImGui::TextDisabled("File: %s.json", file.stem.c_str());
+			}
+			if (const auto modStem = d.isDefaults ? file.stem : ModStemOf(d); modStem != file.stem && modStem != "MyOutfits") {
 				ImGui::SameLine();
 				const auto label = fmt::format("Move to {}.json", modStem);
 				if (ImGui::SmallButton(label.c_str())) {
-					if (g_draft.index == SIZE_MAX) {
-						g_draft.file = store.FileFor(modStem);
+					if (d.index == SIZE_MAX) {
+						d.file = store.FileFor(modStem);
 					} else {
-						MoveDraftToFile(g_draft, store.FileFor(modStem));
+						MoveDraftToFile(d, store.FileFor(modStem));
 					}
 				}
 				if (ImGui::IsItemHovered()) {
@@ -185,34 +208,38 @@ namespace IOD::UI
 				}
 			}
 
-			const auto resolved = Resolve(g_draft.outfit, g_draft.pieces);
+			const auto resolved = Resolve(d.outfit, d.pieces);
 
-			if (ImGui::InputText("Name", g_draft.name, sizeof(g_draft.name))) {
-				g_draft.dirty = true;
-			}
-			if (ImGui::Checkbox("Enabled", &g_draft.enabled)) {
-				g_draft.dirty = true;
-			}
-			ImGui::SameLine();
-			if (ImGui::Checkbox("Unique (leaves rotation once you own every piece)", &g_draft.unique)) {
-				g_draft.dirty = true;
+			if (!d.isDefaults) {
+				if (ImGui::InputText("Name", d.name, sizeof(d.name))) {
+					d.dirty = true;
+				}
+				if (ImGui::Checkbox("Enabled", &d.enabled)) {
+					d.dirty = true;
+				}
+				ImGui::SameLine();
+				if (ImGui::Checkbox("Unique (leaves rotation once you own every piece)", &d.unique)) {
+					d.dirty = true;
+				}
 			}
 
+			const auto sourcesBefore = std::pair{ d.sources, d.gods };
 			ImGui::Text("Sold at:");
+			InheritTag(d, kInheritSources);
 			for (const auto source : kAllSources) {
 				ImGui::PushID(static_cast<int>(source));
 				const std::string label = fmt::format("{} ({})", SourceName(source), SourceWhere(source));
-				if (ImGui::Checkbox(label.c_str(), &g_draft.sources[static_cast<std::size_t>(source)])) {
-					g_draft.dirty = true;
+				if (ImGui::Checkbox(label.c_str(), &d.sources[static_cast<std::size_t>(source)])) {
+					d.dirty = true;
 				}
 				if (const auto warning = SourceWarning(resolved.pieces, source); !warning.empty()) {
 					ImGui::SameLine();
-					ImGui::TextColored(g_draft.sources[static_cast<std::size_t>(source)] ? kWarn : kDim, "%s", warning.c_str());
+					ImGui::TextColored(d.sources[static_cast<std::size_t>(source)] ? kWarn : kDim, "%s", warning.c_str());
 				}
 				ImGui::PopID();
 			}
 			int shrineCount = 0;
-			for (const bool on : g_draft.gods) {
+			for (const bool on : d.gods) {
 				shrineCount += on ? 1 : 0;
 			}
 			const auto shrineLabel = fmt::format("Granted at shrines ({})###shrines", shrineCount);
@@ -225,35 +252,35 @@ namespace IOD::UI
 						ImGui::SeparatorText("Daedric princes");
 					}
 					ImGui::PushID(1000 + god);
-					auto& on = g_draft.gods[static_cast<std::size_t>(god)];
+					auto& on = d.gods[static_cast<std::size_t>(god)];
 					if (ImGui::Checkbox(kGods[static_cast<std::size_t>(god)], &on)) {
-						g_draft.dirty = true;
+						d.dirty = true;
 					}
 					ImGui::SameLine(160.0f);
 					if (!Shrines::GetSingleton()->HasShrine(god)) {
 						ImGui::TextColored(on ? kWarn : kDim, "no shrine in your game");
 					} else {
-						ImGui::TextColored(on ? kGood : kDim, "%s", IsDivine(god) ? "gift, when the requirement is met" : OfferingText(g_draft, god).c_str());
+						ImGui::TextColored(on ? kGood : kDim, "%s", IsDivine(god) ? "gift, when the requirement is met" : OfferingText(d, god).c_str());
 					}
 					ImGui::PopID();
 				}
 
 				// The set's own tribute (Daedra), instead of the god's default for its rarity.
 				ImGui::Spacing();
-				if (ImGui::Checkbox("Own offering (instead of the god's default for this rarity)", &g_draft.ownOffering)) {
-					g_draft.dirty = true;
+				if (ImGui::Checkbox("Own offering (instead of the god's default for this rarity)", &d.ownOffering)) {
+					d.dirty = true;
 				}
-				if (g_draft.ownOffering) {
+				if (d.ownOffering) {
 					static int  s_item = 0;
 					static char s_ref[128]{};
 					int         remove = -1;
-					for (int i = 0; i < static_cast<int>(g_draft.offering.size()); ++i) {
-						auto& line = g_draft.offering[static_cast<std::size_t>(i)];
+					for (int i = 0; i < static_cast<int>(d.offering.size()); ++i) {
+						auto& line = d.offering[static_cast<std::size_t>(i)];
 						ImGui::PushID(2000 + i);
 						ImGui::SetNextItemWidth(110.0f);
 						if (ImGui::InputInt("##count", &line.count, 1, 10)) {
 							line.count = std::max(1, line.count);
-							g_draft.dirty = true;
+							d.dirty = true;
 						}
 						ImGui::SameLine();
 						auto*       form = line.refs.empty() ? nullptr : LookupFormString(line.refs.front());
@@ -266,8 +293,8 @@ namespace IOD::UI
 						ImGui::PopID();
 					}
 					if (remove >= 0) {
-						g_draft.offering.erase(g_draft.offering.begin() + remove);
-						g_draft.dirty = true;
+						d.offering.erase(d.offering.begin() + remove);
+						d.dirty = true;
 					}
 					const auto               known = KnownOfferingItems();
 					std::vector<const char*> labels;
@@ -294,60 +321,85 @@ namespace IOD::UI
 							line.refs = known[static_cast<std::size_t>(s_item)].second;
 						}
 						if (!line.refs.empty()) {
-							g_draft.offering.push_back(std::move(line));
-							g_draft.dirty = true;
+							d.offering.push_back(std::move(line));
+							d.dirty = true;
 						}
 					}
-					if (g_draft.offering.empty()) {
+					if (d.offering.empty()) {
 						ImGui::TextColored(kWarn, "Add at least one item, or untick to use the god's default.");
 					}
 				}
 				ImGui::TreePop();
 			}
 
+			if (std::pair{ d.sources, d.gods } != sourcesBefore) {
+				d.inherit[kInheritSources] = false;
+			}
+
 			ImGui::SetNextItemWidth(160.0f);
-			if (ImGui::Combo("Rarity", &g_draft.rarity, kRarities.data(), static_cast<int>(kRarities.size()))) {
-				g_draft.dirty = true;
+			if (ImGui::Combo("Rarity", &d.rarity, kRarities.data(), static_cast<int>(kRarities.size()))) {
+				d.dirty = true;
+				d.inherit[kInheritRarity] = false;
 			}
-			if (ImGui::Checkbox("Set price", &g_draft.hasPrice)) {
-				g_draft.dirty = true;
+			InheritTag(d, kInheritRarity);
+			const auto priceBefore = std::tuple{ d.hasPrice, d.price };
+			if (ImGui::Checkbox(d.isDefaults ? "Set prices by rarity" : "Set price", &d.hasPrice)) {
+				d.dirty = true;
 			}
-			if (g_draft.hasPrice) {
+			InheritTag(d, kInheritPrice);
+			if (d.isDefaults && d.hasPrice) {
+				for (int r = 0; r < 3; ++r) {
+					ImGui::PushID(4000 + r);
+					ImGui::SetNextItemWidth(140.0f);
+					const auto label = fmt::format("gold for a {} set", kRarities[static_cast<std::size_t>(r)]);
+					if (ImGui::InputInt(label.c_str(), &d.priceByRarity[static_cast<std::size_t>(r)], 100, 1000)) {
+						d.priceByRarity[static_cast<std::size_t>(r)] = std::max(0, d.priceByRarity[static_cast<std::size_t>(r)]);
+						d.dirty = true;
+					}
+					ImGui::PopID();
+				}
+			} else if (d.hasPrice) {
 				ImGui::SameLine();
 				ImGui::SetNextItemWidth(140.0f);
-				if (ImGui::InputInt("gold for the whole set", &g_draft.price, 100, 1000)) {
-					g_draft.price = std::max(0, g_draft.price);
-					g_draft.dirty = true;
+				if (ImGui::InputInt("gold for the whole set", &d.price, 100, 1000)) {
+					d.price = std::max(0, d.price);
+					d.dirty = true;
 				}
 			} else {
 				ImGui::SameLine();
 				ImGui::TextDisabled("(pieces keep their own values)");
 			}
 
-			ImGui::SetNextItemWidth(220.0f);
-			if (ImGui::Combo("Requirement", &g_draft.reqType, kRequirementTypes.data(), static_cast<int>(kRequirementTypes.size()))) {
-				g_draft.dirty = true;
+			if (std::tuple{ d.hasPrice, d.price } != priceBefore) {
+				d.inherit[kInheritPrice] = false;
 			}
-			switch (g_draft.reqType) {
+
+			const auto reqBefore = std::tuple{ d.reqType, d.reqValue, d.reqSkill, d.reqFaction, d.reqGod, d.reqQuest, d.reqPerk, std::string(d.reqRef) };
+			ImGui::SetNextItemWidth(220.0f);
+			if (ImGui::Combo("Requirement", &d.reqType, kRequirementTypes.data(), static_cast<int>(kRequirementTypes.size()))) {
+				d.dirty = true;
+			}
+			InheritTag(d, kInheritRequirement);
+			switch (d.reqType) {
 			case kReqLevel:
 				ImGui::SetNextItemWidth(140.0f);
-				g_draft.dirty |= ImGui::InputInt("at least", &g_draft.reqValue, 1, 10);
-				g_draft.reqValue = std::clamp(g_draft.reqValue, 1, 999);
+				d.dirty |= ImGui::InputInt("at least", &d.reqValue, 1, 10);
+				d.reqValue = std::clamp(d.reqValue, 1, 999);
 				break;
 			case kReqHealth:
 			case kReqMagicka:
 			case kReqStamina:
 				ImGui::SetNextItemWidth(140.0f);
-				if (ImGui::InputInt("at least", &g_draft.reqValue, 50, 100)) {
-					g_draft.reqValue = std::max(0, (g_draft.reqValue + 25) / 50 * 50);  // steps of 50
-					g_draft.dirty = true;
+				if (ImGui::InputInt("at least", &d.reqValue, 50, 100)) {
+					d.reqValue = std::max(0, (d.reqValue + 25) / 50 * 50);  // steps of 50
+					d.dirty = true;
 				}
 				break;
 			case kReqSkill:
 				ImGui::SetNextItemWidth(180.0f);
-				g_draft.dirty |= ImGui::Combo("Skill", &g_draft.reqSkill, kSkills.data(), static_cast<int>(kSkills.size()));
+				d.dirty |= ImGui::Combo("Skill", &d.reqSkill, kSkills.data(), static_cast<int>(kSkills.size()));
 				ImGui::SetNextItemWidth(140.0f);
-				g_draft.dirty |= ImGui::InputInt("at least", &g_draft.reqValue, 1, 10);
+				d.dirty |= ImGui::InputInt("at least", &d.reqValue, 1, 10);
 				break;
 			case kReqFaction:
 				{
@@ -356,11 +408,11 @@ namespace IOD::UI
 						labels[i] = kFactions[i].label;
 					}
 					ImGui::SetNextItemWidth(220.0f);
-					g_draft.dirty |= ImGui::Combo("Faction", &g_draft.reqFaction, labels.data(), static_cast<int>(labels.size()));
-					if (g_draft.reqFaction == kFactionOther) {
-						g_draft.dirty |= ImGui::InputTextWithHint("Faction form", "Plugin.esp|0x123", g_draft.reqRef, sizeof(g_draft.reqRef));
+					d.dirty |= ImGui::Combo("Faction", &d.reqFaction, labels.data(), static_cast<int>(labels.size()));
+					if (d.reqFaction == kFactionOther) {
+						d.dirty |= ImGui::InputTextWithHint("Faction form", "Plugin.esp|0x123", d.reqRef, sizeof(d.reqRef));
 					}
-					const char* ref = g_draft.reqFaction == kFactionOther ? g_draft.reqRef : kFactions[static_cast<std::size_t>(g_draft.reqFaction)].ref;
+					const char* ref = d.reqFaction == kFactionOther ? d.reqRef : kFactions[static_cast<std::size_t>(d.reqFaction)].ref;
 					auto*       form = LookupFormString(ref);
 					auto*       faction = form ? form->As<RE::TESFaction>() : nullptr;
 					if (!faction) {
@@ -373,8 +425,8 @@ namespace IOD::UI
 					}
 					const int maxRank = std::max(0, ranks - 1);
 					ImGui::SetNextItemWidth(140.0f);
-					g_draft.dirty |= ImGui::InputInt("rank at least", &g_draft.reqValue, 1, 1);
-					g_draft.reqValue = std::clamp(g_draft.reqValue, 0, maxRank);
+					d.dirty |= ImGui::InputInt("rank at least", &d.reqValue, 1, 1);
+					d.reqValue = std::clamp(d.reqValue, 0, maxRank);
 					if (ranks > 1) {
 						ImGui::TextDisabled("%s has ranks 0 (joined) to %d.", faction->GetName(), maxRank);
 					} else {
@@ -394,12 +446,12 @@ namespace IOD::UI
 						items.push_back(l.c_str());
 					}
 					ImGui::SetNextItemWidth(320.0f);
-					g_draft.dirty |= ImGui::Combo("Quest", &g_draft.reqQuest, items.data(), static_cast<int>(items.size()));
-					if (g_draft.reqQuest != kQuestOther) {
+					d.dirty |= ImGui::Combo("Quest", &d.reqQuest, items.data(), static_cast<int>(items.size()));
+					if (d.reqQuest != kQuestOther) {
 						break;
 					}
-					g_draft.dirty |= ImGui::InputTextWithHint("Quest form", "MQ202 or Plugin.esp|0x123", g_draft.reqRef, sizeof(g_draft.reqRef));
-					auto* form = LookupFormString(g_draft.reqRef);
+					d.dirty |= ImGui::InputTextWithHint("Quest form", "MQ202 or Plugin.esp|0x123", d.reqRef, sizeof(d.reqRef));
+					auto* form = LookupFormString(d.reqRef);
 					auto* quest = form ? form->As<RE::TESQuest>() : nullptr;
 					if (quest) {
 						ImGui::TextColored(kGood, "Quest: %s", quest->GetName());
@@ -411,11 +463,11 @@ namespace IOD::UI
 			case kReqPerk:
 				{
 					ImGui::SetNextItemWidth(180.0f);
-					if (ImGui::Combo("Skill tree", &g_draft.reqSkill, kSkills.data(), static_cast<int>(kSkills.size()))) {
-						g_draft.reqPerk = 0;
-						g_draft.dirty = true;
+					if (ImGui::Combo("Skill tree", &d.reqSkill, kSkills.data(), static_cast<int>(kSkills.size()))) {
+						d.reqPerk = 0;
+						d.dirty = true;
 					}
-					const auto               perks = PerksOfTree(g_draft.reqSkill);
+					const auto               perks = PerksOfTree(d.reqSkill);
 					std::vector<std::string> labels;
 					for (auto* perk : perks) {
 						labels.push_back(PerkLabel(perk));
@@ -425,16 +477,16 @@ namespace IOD::UI
 					for (const auto& l : labels) {
 						items.push_back(l.c_str());
 					}
-					int index = g_draft.reqPerk < 0 ? static_cast<int>(perks.size()) : g_draft.reqPerk;
+					int index = d.reqPerk < 0 ? static_cast<int>(perks.size()) : d.reqPerk;
 					ImGui::SetNextItemWidth(260.0f);
 					if (ImGui::Combo("Perk", &index, items.data(), static_cast<int>(items.size()))) {
-						g_draft.reqPerk = index >= static_cast<int>(perks.size()) ? -1 : index;
-						g_draft.dirty = true;
+						d.reqPerk = index >= static_cast<int>(perks.size()) ? -1 : index;
+						d.dirty = true;
 					}
-					if (g_draft.reqPerk < 0) {
-						g_draft.dirty |= ImGui::InputTextWithHint("Perk form", "Plugin.esp|0x123", g_draft.reqRef, sizeof(g_draft.reqRef));
+					if (d.reqPerk < 0) {
+						d.dirty |= ImGui::InputTextWithHint("Perk form", "Plugin.esp|0x123", d.reqRef, sizeof(d.reqRef));
 					}
-					if (auto* perk = DraftPerk(g_draft)) {
+					if (auto* perk = DraftPerk(d)) {
 						ImGui::TextColored(kGood, "Perk: %s", PerkLabel(perk).c_str());
 					} else {
 						ImGui::TextColored(kWarn, "No perk found; the set stays hidden until this is fixed.");
@@ -443,117 +495,127 @@ namespace IOD::UI
 				}
 			case kReqBlessing:
 				ImGui::SetNextItemWidth(220.0f);
-				g_draft.dirty |= ImGui::Combo("God", &g_draft.reqGod, kGods.data(), static_cast<int>(kGods.size()));
+				d.dirty |= ImGui::Combo("God", &d.reqGod, kGods.data(), static_cast<int>(kGods.size()));
 				ImGui::TextColored(kWarn, "Shrines arrive in milestone 4; until then this set stays hidden.");
 				break;
 			default:
 				break;
 			}
 
-			// Pieces
-			ImGui::Spacing();
-			ImGui::Text("Pieces (%zu):", resolved.pieces.size());
-			if (resolved.missing > 0) {
-				ImGui::SameLine();
-				ImGui::TextColored(kBad, "%zu reference(s) not loaded (mod disabled?)", resolved.missing);
+			if (std::tuple{ d.reqType, d.reqValue, d.reqSkill, d.reqFaction, d.reqGod, d.reqQuest, d.reqPerk, std::string(d.reqRef) } != reqBefore) {
+				d.inherit[kInheritRequirement] = false;
 			}
-			if (!g_draft.outfit.empty()) {
-				ImGui::TextDisabled("From outfit record %s", g_draft.outfit.c_str());
-			}
-			RE::TESObjectARMO* remove = nullptr;
-			if (ImGui::BeginTable("setpieces", 4, ImGui::ImGuiTableFlags_RowBg | ImGui::ImGuiTableFlags_BordersInnerH)) {
-				ImGui::TableSetupColumn("Piece", ImGui::ImGuiTableColumnFlags_WidthStretch);
-				ImGui::TableSetupColumn("Slots", ImGui::ImGuiTableColumnFlags_WidthFixed, 110.0f);
-				ImGui::TableSetupColumn("Kind", ImGui::ImGuiTableColumnFlags_WidthFixed, 80.0f);
-				ImGui::TableSetupColumn("", ImGui::ImGuiTableColumnFlags_WidthFixed, 70.0f);
-				for (auto* armor : resolved.pieces) {
-					ImGui::PushID(armor);
-					ImGui::TableNextRow();
-					ImGui::TableNextColumn();
-					ImGui::TextUnformatted(armor->GetName());
-					ImGui::TableNextColumn();
-					ImGui::TextUnformatted(Slots(armor).c_str());
-					ImGui::TableNextColumn();
-					ImGui::TextUnformatted(Kind(armor));
-					ImGui::TableNextColumn();
-					if (ImGui::SmallButton("Remove")) {
-						remove = armor;
-					}
-					ImGui::PopID();
+
+			if (!d.isDefaults) {
+				// Pieces
+				ImGui::Spacing();
+				ImGui::Text("Pieces (%zu):", resolved.pieces.size());
+				if (resolved.missing > 0) {
+					ImGui::SameLine();
+					ImGui::TextColored(kBad, "%zu reference(s) not loaded (mod disabled?)", resolved.missing);
 				}
-				ImGui::EndTable();
-			}
-			if (remove) {
-				// An outfit record can't lose a piece: switch the set to an explicit piece list.
-				if (!g_draft.outfit.empty()) {
-					g_draft.pieces.clear();
+				if (!d.outfit.empty()) {
+					ImGui::TextDisabled("From outfit record %s", d.outfit.c_str());
+				}
+				RE::TESObjectARMO* remove = nullptr;
+				if (ImGui::BeginTable("setpieces", 4, ImGui::ImGuiTableFlags_RowBg | ImGui::ImGuiTableFlags_BordersInnerH)) {
+					ImGui::TableSetupColumn("Piece", ImGui::ImGuiTableColumnFlags_WidthStretch);
+					ImGui::TableSetupColumn("Slots", ImGui::ImGuiTableColumnFlags_WidthFixed, 110.0f);
+					ImGui::TableSetupColumn("Kind", ImGui::ImGuiTableColumnFlags_WidthFixed, 80.0f);
+					ImGui::TableSetupColumn("", ImGui::ImGuiTableColumnFlags_WidthFixed, 70.0f);
 					for (auto* armor : resolved.pieces) {
-						g_draft.pieces.push_back(FormString(armor));
-					}
-					g_draft.outfit.clear();
-				}
-				std::erase(g_draft.pieces, FormString(remove));
-				g_draft.dirty = true;
-			}
-			if (ImGui::TreeNode("Add pieces")) {
-				ModCombo(g_addPicker);
-				PieceList(g_addPicker, 220.0f);
-				ImGui::BeginDisabled(g_addPicker.chosen.empty());
-				if (ImGui::Button("Add selected pieces to this set")) {
-					for (auto* armor : g_addPicker.chosen) {
-						const auto ref = FormString(armor);
-						if (std::ranges::find(resolved.pieces, armor) == resolved.pieces.end()) {
-							g_draft.pieces.push_back(ref);
+						ImGui::PushID(armor);
+						ImGui::TableNextRow();
+						ImGui::TableNextColumn();
+						ImGui::TextUnformatted(armor->GetName());
+						ImGui::TableNextColumn();
+						ImGui::TextUnformatted(Slots(armor).c_str());
+						ImGui::TableNextColumn();
+						ImGui::TextUnformatted(Kind(armor));
+						ImGui::TableNextColumn();
+						if (ImGui::SmallButton("Remove")) {
+							remove = armor;
 						}
+						ImGui::PopID();
 					}
-					g_addPicker.chosen.clear();
-					g_draft.dirty = true;
+					ImGui::EndTable();
 				}
-				ImGui::EndDisabled();
-				ImGui::TreePop();
+				if (remove) {
+					// An outfit record can't lose a piece: switch the set to an explicit piece list.
+					if (!d.outfit.empty()) {
+						d.pieces.clear();
+						for (auto* armor : resolved.pieces) {
+							d.pieces.push_back(FormString(armor));
+						}
+						d.outfit.clear();
+					}
+					std::erase(d.pieces, FormString(remove));
+					d.dirty = true;
+				}
+				if (ImGui::TreeNode("Add pieces")) {
+					ModCombo(g_addPicker);
+					PieceList(g_addPicker, 220.0f);
+					ImGui::BeginDisabled(g_addPicker.chosen.empty());
+					if (ImGui::Button("Add selected pieces to this set")) {
+						for (auto* armor : g_addPicker.chosen) {
+							const auto ref = FormString(armor);
+							if (std::ranges::find(resolved.pieces, armor) == resolved.pieces.end()) {
+								d.pieces.push_back(ref);
+							}
+						}
+						g_addPicker.chosen.clear();
+						d.dirty = true;
+					}
+					ImGui::EndDisabled();
+					ImGui::TreePop();
+				}
 			}
 
 			// Actions
 			ImGui::Spacing();
 			ImGui::Separator();
-			ImGui::BeginDisabled(!g_draft.dirty);
+			ImGui::BeginDisabled(!d.dirty);
 			if (ImGui::Button("Save")) {
-				SaveDraft(g_draft);
+				SaveDraft(d);
 			}
 			ImGui::SameLine();
 			if (ImGui::Button("Undo changes")) {
-				if (g_draft.index == SIZE_MAX) {
-					g_draft = Draft{};
+				if (d.isDefaults) {
+					LoadDefaults(d, d.file);
+				} else if (d.index == SIZE_MAX) {
+					d = Draft{};
 				} else {
-					LoadDraft(g_draft, g_draft.file, g_draft.index);
+					LoadDraft(d, d.file, d.index);
 				}
 			}
 			ImGui::EndDisabled();
 			ImGui::SameLine();
 			if (ImGui::Button("Close")) {
-				g_draft = Draft{};
+				d = Draft{};
 				return;
 			}
 			ImGui::SameLine();
-			if (!g_draft.confirmDelete) {
+			if (d.isDefaults) {
+				// defaults can't be deleted
+			} else if (!d.confirmDelete) {
 				if (ImGui::Button("Delete set")) {
-					g_draft.confirmDelete = true;
+					d.confirmDelete = true;
 				}
 			} else {
 				if (ImGui::Button("Really delete?")) {
-					DeleteDraft(g_draft);
+					DeleteDraft(d);
 					return;
 				}
 				ImGui::SameLine();
 				if (ImGui::Button("Keep it")) {
-					g_draft.confirmDelete = false;
+					d.confirmDelete = false;
 				}
 			}
-			if (g_draft.dirty) {
+			if (d.dirty) {
 				ImGui::TextColored(kWarn, "Unsaved changes.");
 			}
-			if (!g_draft.status.empty()) {
-				ImGui::TextWrapped("%s", g_draft.status.c_str());
+			if (!d.status.empty()) {
+				ImGui::TextWrapped("%s", d.status.c_str());
 			}
 		}
 
@@ -597,7 +659,7 @@ namespace IOD::UI
 				for (std::size_t f = 0; f < files.size(); ++f) {
 					auto& sets = files[f].Sets();
 					for (std::size_t i = 0; i < sets.size(); ++i) {
-						const auto& entry = sets[i];
+						const auto  entry = Effective(files[f].root.contains("defaults") ? files[f].root["defaults"] : nlohmann::json{}, sets[i], nullptr);
 						const auto  name = entry.value("name", "(no name)");
 						if (!Contains(name, g_setFilter)) {
 							continue;
@@ -662,11 +724,48 @@ namespace IOD::UI
 				ImGui::TextDisabled("No sets yet. Use \"New set\" to create one.");
 			}
 			if (g_draft.active) {
-				RenderEditor();
+				RenderEditor(g_draft);
 			}
 		}
 
-		Picker g_newPicker;
+		Picker      g_newPicker;
+		std::string g_importStatus;
+		Draft       g_defaults;  // the mod defaults being edited
+		int         g_defaultsFile{ -1 };
+
+		void __stdcall RenderDefaults()
+		{
+			std::scoped_lock lock(Lock());
+			auto&            files = SetFiles::Get().Files();
+			ImGui::TextWrapped("Each armour mod's file can hold defaults: where its sets are sold, their rarity, a price per rarity and a requirement. A set uses a default for every field it doesn't set itself, so you set up a mod once. In a set, \"Use mod default\" undoes an exception.");
+			if (files.empty()) {
+				ImGui::TextDisabled("No set files yet. Make a set first (New set).");
+				return;
+			}
+			const char* preview = g_defaultsFile >= 0 && g_defaultsFile < static_cast<int>(files.size()) ? files[static_cast<std::size_t>(g_defaultsFile)].stem.c_str() : "Choose a mod file";
+			ImGui::SetNextItemWidth(320.0f);
+			if (ImGui::BeginCombo("Mod file", preview)) {
+				for (int f = 0; f < static_cast<int>(files.size()); ++f) {
+					const auto label = fmt::format("{}  ({} set(s){})##{}", files[static_cast<std::size_t>(f)].stem, files[static_cast<std::size_t>(f)].Sets().size(),
+						files[static_cast<std::size_t>(f)].root.contains("defaults") ? ", has defaults" : "", f);
+					if (ImGui::Selectable(label.c_str(), f == g_defaultsFile)) {
+						g_defaultsFile = f;
+						LoadDefaults(g_defaults, static_cast<std::size_t>(f));
+					}
+				}
+				ImGui::EndCombo();
+			}
+			if (g_defaultsFile >= static_cast<int>(files.size())) {
+				g_defaultsFile = -1;
+				g_defaults = Draft{};
+			}
+			if (g_defaults.active && g_defaults.isDefaults) {
+				RenderEditor(g_defaults);
+				if (!g_defaults.active) {  // "Close"
+					g_defaultsFile = -1;
+				}
+			}
+		}
 		char   g_newName[128]{};
 
 		void __stdcall RenderNewSet()
@@ -683,6 +782,18 @@ namespace IOD::UI
 
 			if (ImGui::BeginTabBar("newset")) {
 				if (!mod.outfits.empty() && ImGui::BeginTabItem("Outfit records")) {
+					const auto importLabel = fmt::format("Make sets from all {} outfits", mod.outfits.size());
+					if (ImGui::Button(importLabel.c_str())) {
+						ImportOutfits(mod.outfits, g_importStatus);
+					}
+					if (ImGui::IsItemHovered()) {
+						ImGui::SetTooltip("One set per outfit, in %s.json, using the mod's defaults (where sold, rarity, price, requirement). Outfits that already have a set are skipped.",
+							SetFiles::StemForPlugin(mod.file).c_str());
+					}
+					if (!g_importStatus.empty()) {
+						ImGui::TextWrapped("%s", g_importStatus.c_str());
+					}
+					ImGui::Separator();
 					for (auto* outfit : mod.outfits) {
 						const auto pieces = OutfitPieces(outfit);
 						if (pieces.empty()) {
@@ -805,6 +916,7 @@ namespace IOD::UI
 		SKSEMenuFramework::SetSection("Immersive Outfit Distribution");
 		SKSEMenuFramework::AddSectionItem("Sets", RenderSets);
 		SKSEMenuFramework::AddSectionItem("New set", RenderNewSet);
+		SKSEMenuFramework::AddSectionItem("Mod defaults", RenderDefaults);
 		SKSEMenuFramework::AddSectionItem("Vendors", RenderVendors);
 		SKSEMenuFramework::AddSectionItem("Settings", RenderSettings);
 		spdlog::info("Settings page registered with SKSE Menu Framework");

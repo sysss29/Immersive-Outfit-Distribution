@@ -168,6 +168,10 @@ Function ShowEditor()
 	SetCursorPosition(0)
 	AddHeaderOption(IOD_Native.GetText(s, "name"))
 	oBack = AddTextOption("Back to all sets", "")
+	String inherited = IOD_Native.GetText(s, "inherited")
+	If inherited != ""
+		AddTextOption("From mod defaults:", inherited, OPTION_FLAG_DISABLED)
+	EndIf
 	oEnabled = AddToggleOption("Enabled", IOD_Native.GetBool(s, "enabled"))
 	oUnique = AddToggleOption("Leaves rotation once owned", IOD_Native.GetBool(s, "unique"))
 	AddHeaderOption("Sold at")
