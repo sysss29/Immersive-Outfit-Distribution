@@ -32,7 +32,8 @@ namespace IOD
 		RE::BSEventNotifyControl ProcessEvent(RE::InputEvent* const* a_event, RE::BSTEventSource<RE::InputEvent*>*) override;
 
 		void        Pray(int a_god, bool a_vanillaBlessing);  // game thread
-		void        CheckNearbyStatues();                     // game thread
+		void        CheckNearbyStatues();                     // game thread (also checks Divine deeds)
+		void        CheckDivineDeeds();                       // game thread
 		static void StartWatching();                          // background timer for CheckNearbyStatues
 		std::string AcceptLine(int a_god) const;
 

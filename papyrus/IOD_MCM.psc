@@ -70,21 +70,21 @@ EndEvent
 
 Function ClearIds()
 	listIds = new Int[128]
-	vendorIds = new Int[16]
-	oSources = new Int[3]
-	oWarnings = new Int[3]
+	vendorIds = new Int[32]
+	oSources = new Int[16]
+	oWarnings = new Int[16]
 	Int i = 0
 	While i < 128
 		listIds[i] = -1
 		i += 1
 	EndWhile
 	i = 0
-	While i < 16
+	While i < 32
 		vendorIds[i] = -1
 		i += 1
 	EndWhile
 	i = 0
-	While i < 3
+	While i < 16
 		oSources[i] = -1
 		oWarnings[i] = -1
 		i += 1
@@ -171,12 +171,9 @@ Function ShowEditor()
 	oEnabled = AddToggleOption("Enabled", IOD_Native.GetBool(s, "enabled"))
 	oUnique = AddToggleOption("Leaves rotation once owned", IOD_Native.GetBool(s, "unique"))
 	AddHeaderOption("Sold at")
-	String[] sources = new String[3]
-	sources[0] = "Radiant Raiment"
-	sources[1] = "Khajiit caravans"
-	sources[2] = "Thieves Guild fences"
+	String[] sources = ListOf("sources")
 	Int i = 0
-	While i < 3
+	While i < sources.Length && i < 16
 		oSources[i] = AddToggleOption(sources[i], IOD_Native.GetBool(s, "src" + i))
 		If IOD_Native.GetText(s, "warn" + i) != ""
 			oWarnings[i] = AddTextOption("   can't sell this kind of item", "?", OPTION_FLAG_DISABLED)
@@ -271,7 +268,7 @@ Function ShowVendors()
 		AddTextOption("Load a save first", "", OPTION_FLAG_DISABLED)
 	EndIf
 	Int i = 0
-	While i < vendorNames.Length && i < 16
+	While i < vendorNames.Length && i < 32
 		vendorIds[i] = AddTextOption(vendorNames[i], vendorStock[i])
 		i += 1
 	EndWhile
@@ -362,7 +359,7 @@ EndFunction
 
 Int Function SourceIndex(Int aiOption)
 	Int i = 0
-	While i < 3
+	While i < 16
 		If oSources[i] == aiOption
 			Return i
 		EndIf
@@ -529,7 +526,7 @@ EndEvent
 Event OnOptionHighlight(Int aiOption)
 	Int src = SourceIndex(aiOption)
 	Int i = 0
-	While i < 16
+	While i < 32
 		If vendorIds[i] == aiOption && aiOption != -1
 			SetInfoText(vendorNames[i] + ": " + vendorStock[i])
 			Return

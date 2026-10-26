@@ -186,7 +186,7 @@ namespace IOD::UI
 			ImGui::Text("Sold at:");
 			for (const auto source : kAllSources) {
 				ImGui::PushID(static_cast<int>(source));
-				const std::string label(SourceName(source));
+				const std::string label = fmt::format("{} ({})", SourceName(source), SourceWhere(source));
 				if (ImGui::Checkbox(label.c_str(), &g_draft.sources[static_cast<std::size_t>(source)])) {
 					g_draft.dirty = true;
 				}

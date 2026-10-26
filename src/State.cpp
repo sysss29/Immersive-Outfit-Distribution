@@ -6,7 +6,7 @@ namespace IOD
 	{
 		constexpr std::uint32_t kUniqueID = 'IOD1';
 		constexpr std::uint32_t kRecord = 'IODS';
-		constexpr std::uint32_t kVersion = 3;  // 2: + blessing, offering cooldowns; 3: + noticed statues
+		constexpr std::uint32_t kVersion = 4;  // 2: + blessing, offering cooldowns; 3: + noticed statues; 4: + announced gifts
 
 		template <class T>
 		bool Write(SKSE::SerializationInterface* a_intfc, const T& a_value)
@@ -72,6 +72,10 @@ namespace IOD
 			ok = ok && Write(a_intfc, static_cast<std::uint32_t>(s.noticed.size()));
 			for (const auto god : s.noticed) {
 				ok = ok && Write(a_intfc, god);
+			}
+			ok = ok && Write(a_intfc, static_cast<std::uint32_t>(s.announced.size()));
+			for (const auto& id : s.announced) {
+				ok = ok && WriteString(a_intfc, id);
 			}
 			if (!ok) {
 				spdlog::error("Failed to write save data");
@@ -146,6 +150,16 @@ namespace IOD
 						}
 					}
 				}
+				if (version >= 4) {
+					ok = ok && Read(a_intfc, count);
+					for (std::uint32_t i = 0; ok && i < count; ++i) {
+						std::string id;
+						ok = ReadString(a_intfc, id);
+						if (ok) {
+							s.announced.insert(std::move(id));
+						}
+					}
+				}
 				if (!ok) {
 					spdlog::error("Save data was incomplete; starting fresh");
 					s.Reset();
@@ -176,6 +190,7 @@ namespace IOD
 		blessing = -1;
 		lastOffering.clear();
 		noticed.clear();
+		announced.clear();
 	}
 
 	void State::Register()

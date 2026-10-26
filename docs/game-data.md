@@ -16,6 +16,22 @@ on 2026-10-25. Form IDs are local to the plugin named.
 | Thieves Guild | ServicesThievesGuildCaravanMajhad | Skyrim.esm 0D8E52 | 0D8E4F | always |
 | Thieves Guild | ServicesThievesGuildCaravanZaynabi | Skyrim.esm 0D8E54 | 0D8E50 | always |
 
+Added in 0.5.0 (each chest's base container is used by that chest only, checked in all four masters):
+
+| Source | Faction (EditorID) | Form ID | Trades | Who |
+| --- | --- | --- | --- | --- |
+| Eorlund Gray-Mane | ServicesWhiterunEorlund | Skyrim.esm 10FDE8 | armour | Eorlund (Skyforge) |
+| Dremora Merchant | DLC2DremoraMerchantFaction | Dragonborn.esm 01EEC4 | all but clutter | summoned (Black Book: Filament and Filigree) |
+| Hestla | DLC1ServicesHestla | Dawnguard.esm 01047E | armour | Castle Volkihar |
+| Gunmar | DLC1ServicesGunmar | Dawnguard.esm 00F827 | armour | Fort Dawnguard |
+| Baldor Iron-Shaper | DLC2SkaalBlacksmith | Dragonborn.esm 01F899 | anything | Skaal Village |
+| Tel Mithryn | DLC2ServicesTelMithrynNeloth / Talvas | Dragonborn.esm 0177C7, 0177C6 | clothing | Neloth, Talvas |
+| Sybille Stentor | ServicesSolitudeSybilleStentor | Skyrim.esm 0B2036 | clothing | Blue Palace |
+| East Empire Company | ServicesSolitudeEastEmpireCompany | Skyrim.esm 0D6AC5 | anything | Vittoria Vici, Aquillius Aeresius |
+| Ghorza gra-Bagol | ServicesMarkarthBlacksmith | Skyrim.esm 094390 | armour | Ghorza, Tacitus Sallustius |
+| Dushnamub | ServicesNarzulburDushnamub | Skyrim.esm 0B3FE3 | armour | Narzulbur |
+| Niranye | ServicesWindhelmNiranye | Skyrim.esm 0A3F07 | anything | Windhelm market |
+
 The caravan fences (Atahbah, Ma'jhad, Zaynabi) have no vendor faction on their base record; the
 Thieves Guild fence quests add it at runtime, so they only trade (and only receive IOD stock) once
 unlocked. Vex (Skyrim.esm 01CD90) has no vendor faction.

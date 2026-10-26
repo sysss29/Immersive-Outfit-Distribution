@@ -54,10 +54,19 @@ namespace IOD::Papyrus
 			return true;
 		}
 
-		Source SourceOf(std::string_view a_field)  // "src0".."src2"
+		// "src3" -> kAllSources[3]; also used for "warn3"
+		std::size_t IndexAfter(std::string_view a_field, std::size_t a_prefix)
 		{
-			const auto n = a_field.size() > 3 ? a_field[3] - '0' : 0;
-			return kAllSources[static_cast<std::size_t>(std::clamp(n, 0, 2))];
+			int n = 0;
+			for (std::size_t i = a_prefix; i < a_field.size() && std::isdigit(static_cast<unsigned char>(a_field[i])); ++i) {
+				n = n * 10 + (a_field[i] - '0');
+			}
+			return static_cast<std::size_t>(std::clamp(n, 0, static_cast<int>(kAllSources.size()) - 1));
+		}
+
+		Source SourceOf(std::string_view a_field)
+		{
+			return kAllSources[IndexAfter(a_field, 3)];
 		}
 
 		std::string StatusOf(const nlohmann::json& a_entry)
@@ -352,9 +361,8 @@ namespace IOD::Papyrus
 				}
 				return "";
 			}
-			if (field.starts_with("warn")) {  // warn0..warn2: why a source can't sell this set
-				const auto n = std::clamp(field.size() > 4 ? field[4] - '0' : 0, 0, 2);
-				return Safe(SourceWarning(resolved.pieces, kAllSources[static_cast<std::size_t>(n)]));
+			if (field.starts_with("warn")) {  // warn0..warnN: why a source can't sell this set
+				return Safe(SourceWarning(resolved.pieces, kAllSources[IndexAfter(field, 4)]));
 			}
 			if (field == "pieces") {
 				std::string text;
@@ -412,6 +420,10 @@ namespace IOD::Papyrus
 			} else if (list == "skills") {
 				for (const auto* s : kSkills) {
 					out.emplace_back(s);
+				}
+			} else if (list == "sources") {
+				for (const auto source : kAllSources) {
+					out.emplace_back(Safe(std::string(SourceName(source))));
 				}
 			} else if (list == "shrines") {
 				out.emplace_back("No shrine");

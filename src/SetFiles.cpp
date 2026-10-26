@@ -15,7 +15,9 @@ namespace IOD
 //   name         required, unique within this file
 //   outfit       an outfit record the mod defines (all its armour pieces are used), and/or
 //   pieces       a list of armour records
-//   sources      "Radiant Raiment", "Khajiit caravans", "Thieves Guild", and/or gods whose shrine grants
+//   sources      merchants: "Radiant Raiment", "Khajiit caravans", "Thieves Guild", "Eorlund Gray-Mane",
+//                "Dremora Merchant", "Hestla", "Gunmar", "Baldor Iron-Shaper", "Tel Mithryn", "Sybille Stentor",
+//                "East Empire Company", "Ghorza gra-Bagol", "Dushnamub", "Niranye"; and/or gods whose shrine grants
 //                it: "Dibella", "Talos", "Sanguine", ... (the Nine Divines and the Daedric princes)
 //                Radiant Raiment only trades clothing and jewellery: armour sets placed there never
 //                appear (the log and the settings page warn). The caravans and fences trade anything.

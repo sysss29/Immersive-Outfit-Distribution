@@ -122,6 +122,36 @@ namespace IOD
 			std::vector<std::string> _sets;
 		};
 
+		// Answer to a Divine's gift list: button i receives the i-th earned set.
+		class GiftCallback : public RE::IMessageBoxCallback
+		{
+		public:
+			GiftCallback(int a_god, std::vector<std::string> a_sets) :
+				_god(a_god), _sets(std::move(a_sets)) {}
+
+			void Run(std::uint8_t a_button) override
+			{
+				if (a_button >= _sets.size()) {
+					return;
+				}
+				SKSE::GetTaskInterface()->AddTask([god = _god, id = _sets[a_button]]() {
+					auto*       player = RE::PlayerCharacter::GetSingleton();
+					const auto* chosen = Catalog::GetSingleton().Find(id);
+					if (!player || !chosen || State::Get().owned.contains(id) || !IsMet(chosen->requirement, player)) {
+						return;
+					}
+					Grant(player, *chosen);
+					spdlog::info("{} gave \"{}\"", GodName(god), chosen->name);
+					Notify(Shrines::GetSingleton()->AcceptLine(god));
+					Notify(fmt::format("Received: {}", chosen->name));
+				});
+			}
+
+		private:
+			int                      _god;
+			std::vector<std::string> _sets;
+		};
+
 		bool ShowBox(const std::string& a_body, const std::vector<std::string>& a_buttons, RE::IMessageBoxCallback* a_callback)
 		{
 			auto* factory = RE::MessageDataFactoryManager::GetSingleton();
@@ -369,16 +399,23 @@ namespace IOD
 		}
 
 		if (IsDivine(a_god)) {
-			// The Divines don't trade: they reward deeds. A set whose requirement is met (typically
-			// a quest completed) is given freely, once.
-			for (const auto* set : sets) {
+			// The Divines don't trade: they reward deeds. Every gift is listed with the deed it
+			// asks for; the earned ones can be received.
+			std::string              body = fmt::format("{} welcomes you.\n", GodName(a_god));
+			std::vector<std::string> buttons;
+			std::vector<std::string> ids;
+			for (std::size_t i = 0; i < sets.size() && i < 8; ++i) {
+				const auto* set = sets[i];
 				if (IsMet(set->requirement, player)) {
-					Grant(player, *set);
-					spdlog::info("{} rewards the player with \"{}\"", GodName(a_god), set->name);
-					Notify(AcceptLine(a_god));
-					Notify(fmt::format("{} rewards you: {}", GodName(a_god), set->name));
+					body += fmt::format("\n{}: your deeds have earned it.", set->name);
+					buttons.push_back(fmt::format("Receive {}", set->name));
+					ids.push_back(set->id);
+				} else {
+					body += fmt::format("\n{}: earned by {}.", set->name, set->requirement.label);
 				}
 			}
+			buttons.emplace_back(ids.empty() ? "Leave" : "Not now");
+			ShowBox(body, buttons, new GiftCallback(a_god, std::move(ids)));
 			return;
 		}
 
@@ -414,8 +451,33 @@ namespace IOD
 
 	// Called every few seconds: the first time the player comes near a prince's statue that has
 	// sets to give, a line hints at it.
+	// When the deed behind a Divine gift is done (a quest completed, a level reached...), the god
+	// lets the player know, once.
+	void Shrines::CheckDivineDeeds()
+	{
+		auto* player = RE::PlayerCharacter::GetSingleton();
+		auto* ui = RE::UI::GetSingleton();
+		if (!player || !player->Is3DLoaded() || (ui && ui->GameIsPaused())) {
+			return;
+		}
+		auto& state = State::Get();
+		for (const auto& set : Catalog::GetSingleton().Sets()) {
+			if (set.requirement.type == Requirement::Type::kNone || state.owned.contains(set.id) || state.announced.contains(set.id)) {
+				continue;
+			}
+			const auto god = std::ranges::find_if(set.gods, [](int a_god) { return IsDivine(a_god); });
+			if (god == set.gods.end() || !IsMet(set.requirement, player)) {
+				continue;
+			}
+			state.announced.insert(set.id);
+			spdlog::info("Deed done for \"{}\" ({})", set.name, GodName(*god));
+			Notify(fmt::format("{} has taken notice of your deeds. Seek their shrine.", GodName(*god)));
+		}
+	}
+
 	void Shrines::CheckNearbyStatues()
 	{
+		CheckDivineDeeds();
 		auto* player = RE::PlayerCharacter::GetSingleton();
 		auto* tes = RE::TES::GetSingleton();
 		if (!player || !tes || !player->Is3DLoaded() || _statues.empty()) {

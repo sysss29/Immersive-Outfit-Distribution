@@ -92,7 +92,8 @@ namespace IOD
 				return std::nullopt;
 			}
 			req.type = Requirement::Type::kQuest;
-			req.label = fmt::format("quest {} completed", ref);
+			const char* questName = req.form->GetName();
+			req.label = questName && *questName ? fmt::format("completing {}", questName) : fmt::format("completing quest {}", ref);
 		} else if (type == "perk") {
 			const auto ref = a_json.value("perk", "");
 			req.form = LookupFormString(ref);

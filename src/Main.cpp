@@ -56,7 +56,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 {
 	SKSE::Init(a_skse);
 	InitLogging();
-	spdlog::info("Immersive Outfit Distribution 0.4.1 on Skyrim {}", REL::Module::get().version().string());
+	spdlog::info("Immersive Outfit Distribution 0.5.0 on Skyrim {}", REL::Module::get().version().string());
 
 	IOD::State::Register();
 	IOD::Papyrus::Install();

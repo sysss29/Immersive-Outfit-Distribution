@@ -93,7 +93,7 @@ namespace IOD::Edit
 		bool                     unique{ true };
 		std::string              outfit;
 		std::vector<std::string> pieces;
-		std::array<bool, 3>      sources{};
+		std::array<bool, kAllSources.size()> sources{};
 		std::array<bool, kGods.size()> gods{};  // shrines that grant it
 		int                      rarity{ 0 };
 		bool                     hasPrice{ false };
