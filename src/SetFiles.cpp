@@ -37,7 +37,7 @@ namespace IOD
 //   enabled      true (default)
 )";
 
-		constexpr std::array kFieldOrder{ "name"sv, "enabled"sv, "outfit"sv, "pieces"sv, "sources"sv, "rarity"sv, "price"sv, "requirement"sv, "unique"sv };
+		constexpr std::array kFieldOrder{ "name"sv, "id"sv, "enabled"sv, "outfit"sv, "pieces"sv, "sources"sv, "rarity"sv, "price"sv, "requirement"sv, "unique"sv };
 
 		std::string Dump(const nlohmann::json& a_value)
 		{
@@ -142,6 +142,51 @@ namespace IOD
 			_files.push_back(std::move(file));
 		}
 		std::ranges::sort(_files, {}, &SetFile::stem);
+
+		// Every set gets a permanent id the first time it's seen, so renaming or moving it between
+		// files keeps what the save knows about it.
+		for (std::size_t f = 0; f < _files.size(); ++f) {
+			bool added = false;
+			for (auto& entry : _files[f].Sets()) {
+				if (entry.is_object() && (!entry.contains("id") || !entry["id"].is_string() || entry["id"].get<std::string>().empty())) {
+					entry["id"] = NewId();
+					added = true;
+				}
+			}
+			if (added) {
+				spdlog::info("{}: gave sets a permanent id", _files[f].path.filename().string());
+				Save(f);
+			}
+		}
+	}
+
+	std::string SetFiles::NewId()
+	{
+		static std::mt19937 rng{ std::random_device{}() };
+		return fmt::format("iod-{:08x}", rng());
+	}
+
+	std::string SetFiles::StemForPlugin(std::string_view a_plugin)
+	{
+		std::string stem(a_plugin);
+		if (const auto dot = stem.find_last_of('.'); dot != std::string::npos) {
+			stem.erase(dot);
+		}
+		std::erase_if(stem, [](char c) { return std::string_view("<>:\"/\\|?*").find(c) != std::string_view::npos || static_cast<unsigned char>(c) < 32; });
+		return stem.empty() ? std::string("MyOutfits") : stem;
+	}
+
+	std::size_t SetFiles::FileFor(std::string_view a_stem)
+	{
+		for (std::size_t i = 0; i < _files.size(); ++i) {
+			if (_files[i].stem == a_stem) {
+				return i;
+			}
+		}
+		std::filesystem::path path{ kSetDir };
+		path /= std::string(a_stem) + ".json";
+		_files.push_back({ path, std::string(a_stem), nlohmann::json{ { "sets", nlohmann::json::array() } } });
+		return _files.size() - 1;
 	}
 
 	std::size_t SetFiles::DefaultFile()

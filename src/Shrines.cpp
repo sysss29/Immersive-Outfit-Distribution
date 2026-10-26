@@ -11,12 +11,6 @@ namespace IOD
 		constexpr auto kRegistryPath = "Data/SKSE/Plugins/ImmersiveOutfitDistribution/Shrines/Shrines.json"sv;
 		const Offering kNoOffering{};
 
-		float Today()
-		{
-			auto* calendar = RE::Calendar::GetSingleton();
-			return calendar ? calendar->GetDaysPassed() : 0.0f;
-		}
-
 		std::int32_t CountOf(const RE::TESObjectREFR::InventoryCountMap& a_counts, const OfferingItem& a_item)
 		{
 			std::int32_t total = 0;
@@ -84,6 +78,7 @@ namespace IOD
 				a_player->AddObjectToContainer(piece, nullptr, 1, nullptr);
 			}
 			State::Get().owned.insert(a_set.id);
+			Shrines::GetSingleton()->UpdateSnapshot();
 		}
 
 		// Answer to the tribute list: button i is the i-th set offered, the last one is "Leave".
@@ -175,6 +170,39 @@ namespace IOD
 		}
 	}
 
+	// For the MCM (Papyrus thread): what each god grants, computed on the game thread.
+	void Shrines::UpdateSnapshot()
+	{
+		std::vector<std::string> lines;
+		auto&                    state = State::Get();
+		for (int g = 0; g < static_cast<int>(kGods.size()); ++g) {
+			int total = 0;
+			int left = 0;
+			for (const auto& set : Catalog::GetSingleton().Sets()) {
+				if (set.HasGod(g)) {
+					++total;
+					left += state.owned.contains(set.id) ? 0 : 1;
+				}
+			}
+			if (total == 0) {
+				continue;
+			}
+			auto status = fmt::format("{} of {} set(s) left, {}", left, total, IsDivine(g) ? "gifts for deeds" : "for tribute");
+			if (!HasShrine(g)) {
+				status += ", no shrine";
+			}
+			lines.push_back(fmt::format("{}|{}", GodName(g), status));
+		}
+		std::scoped_lock lock(_snapshotLock);
+		_snapshot = std::move(lines);
+	}
+
+	std::vector<std::string> Shrines::Snapshot() const
+	{
+		std::scoped_lock lock(_snapshotLock);
+		return _snapshot;
+	}
+
 	Shrines* Shrines::GetSingleton()
 	{
 		static Shrines singleton;
@@ -204,7 +232,6 @@ namespace IOD
 			spdlog::error("Shrine registry is not valid JSON ({}): shrines are inactive", e.what());
 			return;
 		}
-		_cooldownDays = root.value("cooldownDays", 7.0f);
 		_reach = root.value("statueReach", 700.0f);
 
 		if (root.contains("gods") && root["gods"].is_object()) {
@@ -277,16 +304,6 @@ namespace IOD
 	const Offering& Shrines::OfferingFor(const OutfitSet& a_set, int a_god) const
 	{
 		return a_set.offering.empty() ? DefaultOffering(a_god, a_set.rarity) : a_set.offering;
-	}
-
-	float Shrines::CooldownDaysLeft(int a_god) const
-	{
-		const auto& last = State::Get().lastOffering;
-		const auto  it = last.find(a_god);
-		if (it == last.end()) {
-			return 0.0f;
-		}
-		return std::max(0.0f, it->second + _cooldownDays - Today());
 	}
 
 	RE::BSEventNotifyControl Shrines::ProcessEvent(const RE::TESActivateEvent* a_event, RE::BSTEventSource<RE::TESActivateEvent>*)

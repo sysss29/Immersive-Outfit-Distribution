@@ -159,7 +159,8 @@ namespace IOD::UI
 
 		// --- pages --------------------------------------------------------------------------
 
-		char   g_setFilter[64]{};
+		char        g_setFilter[64]{};
+		std::string g_splitStatus;
 		Picker g_addPicker;  // "Add pieces" inside the editor
 
 		void RenderEditor()
@@ -169,6 +170,20 @@ namespace IOD::UI
 			ImGui::Spacing();
 			ImGui::SeparatorText(g_draft.index == SIZE_MAX ? "New set (not saved yet)" : "Edit set");
 			ImGui::TextDisabled("File: %s.json", file.stem.c_str());
+			if (const auto modStem = ModStemOf(g_draft); modStem != file.stem && modStem != "MyOutfits") {
+				ImGui::SameLine();
+				const auto label = fmt::format("Move to {}.json", modStem);
+				if (ImGui::SmallButton(label.c_str())) {
+					if (g_draft.index == SIZE_MAX) {
+						g_draft.file = store.FileFor(modStem);
+					} else {
+						MoveDraftToFile(g_draft, store.FileFor(modStem));
+					}
+				}
+				if (ImGui::IsItemHovered()) {
+					ImGui::SetTooltip("One file per armour mod: easy to back up, share, or reuse in a new game.");
+				}
+			}
 
 			const auto resolved = Resolve(g_draft.outfit, g_draft.pieces);
 
@@ -221,6 +236,71 @@ namespace IOD::UI
 						ImGui::TextColored(on ? kGood : kDim, "%s", IsDivine(god) ? "gift, when the requirement is met" : OfferingText(g_draft, god).c_str());
 					}
 					ImGui::PopID();
+				}
+
+				// The set's own tribute (Daedra), instead of the god's default for its rarity.
+				ImGui::Spacing();
+				if (ImGui::Checkbox("Own offering (instead of the god's default for this rarity)", &g_draft.ownOffering)) {
+					g_draft.dirty = true;
+				}
+				if (g_draft.ownOffering) {
+					static int  s_item = 0;
+					static char s_ref[128]{};
+					int         remove = -1;
+					for (int i = 0; i < static_cast<int>(g_draft.offering.size()); ++i) {
+						auto& line = g_draft.offering[static_cast<std::size_t>(i)];
+						ImGui::PushID(2000 + i);
+						ImGui::SetNextItemWidth(110.0f);
+						if (ImGui::InputInt("##count", &line.count, 1, 10)) {
+							line.count = std::max(1, line.count);
+							g_draft.dirty = true;
+						}
+						ImGui::SameLine();
+						auto*       form = line.refs.empty() ? nullptr : LookupFormString(line.refs.front());
+						const char* name = form ? (form->GetFormID() == 0xF ? "gold" : form->GetName()) : "not loaded";
+						ImGui::Text("%s%s", name, line.refs.size() > 1 ? " (or similar)" : "");
+						ImGui::SameLine();
+						if (ImGui::SmallButton("Remove")) {
+							remove = i;
+						}
+						ImGui::PopID();
+					}
+					if (remove >= 0) {
+						g_draft.offering.erase(g_draft.offering.begin() + remove);
+						g_draft.dirty = true;
+					}
+					const auto               known = KnownOfferingItems();
+					std::vector<const char*> labels;
+					for (const auto& item : known) {
+						labels.push_back(item.first.c_str());
+					}
+					labels.push_back("Other (enter editor ID or form)");
+					ImGui::SetNextItemWidth(240.0f);
+					ImGui::Combo("##offeritem", &s_item, labels.data(), static_cast<int>(labels.size()));
+					const bool other = s_item >= static_cast<int>(known.size());
+					if (other) {
+						ImGui::SameLine();
+						ImGui::SetNextItemWidth(200.0f);
+						ImGui::InputTextWithHint("##offerref", "Skyrim.esm|0x63B45", s_ref, sizeof(s_ref));
+					}
+					ImGui::SameLine();
+					if (ImGui::Button("Add to offering")) {
+						Draft::OfferingLine line;
+						if (other) {
+							if (LookupFormString(s_ref)) {
+								line.refs.emplace_back(s_ref);
+							}
+						} else {
+							line.refs = known[static_cast<std::size_t>(s_item)].second;
+						}
+						if (!line.refs.empty()) {
+							g_draft.offering.push_back(std::move(line));
+							g_draft.dirty = true;
+						}
+					}
+					if (g_draft.offering.empty()) {
+						ImGui::TextColored(kWarn, "Add at least one item, or untick to use the god's default.");
+					}
 				}
 				ImGui::TreePop();
 			}
@@ -490,6 +570,19 @@ namespace IOD::UI
 				g_draft = Draft{};
 				ApplyChanges();
 			}
+			ImGui::SameLine();
+			if (ImGui::Button("One file per armour mod")) {
+				g_draft = Draft{};
+				const auto moved = SplitByMod();
+				g_splitStatus = moved ? fmt::format("Moved {} set(s) into their mod's file.", moved) : "Every set is already in its mod's file.";
+			}
+			if (ImGui::IsItemHovered()) {
+				ImGui::SetTooltip("Moves each set into a file named after its armour mod (e.g. Cute Maid.json). Copy such a file to share or reuse a mod's sets.");
+			}
+			if (!g_splitStatus.empty()) {
+				ImGui::SameLine();
+				ImGui::TextDisabled("%s", g_splitStatus.c_str());
+			}
 
 			const int flags = ImGui::ImGuiTableFlags_RowBg | ImGui::ImGuiTableFlags_ScrollY | ImGui::ImGuiTableFlags_BordersInnerH;
 			const float height = g_draft.active ? 200.0f : 0.0f;
@@ -688,6 +781,10 @@ namespace IOD::UI
 			auto& settings = Settings::Get();
 			bool  changed = false;
 			changed |= ImGui::Checkbox("Show \"New arrivals\" when a vendor has new sets", &settings.arrivalMessage);
+			changed |= ImGui::Checkbox("Balance the draw between armour mods", &settings.balanceByMod);
+			if (ImGui::IsItemHovered()) {
+				ImGui::SetTooltip("Each mod gets the same chance, however many sets it has; within a mod, rarity decides.");
+			}
 			changed |= ImGui::Checkbox("Testing: every vendor gets at least one set per period", &settings.guaranteeOnePerVendor);
 			ImGui::TextDisabled("Applies from the next draw (or press \"Redraw now\" under Vendors).");
 			if (changed) {

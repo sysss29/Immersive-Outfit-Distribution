@@ -23,6 +23,9 @@ namespace IOD
 		void                  Load();
 		std::vector<SetFile>& Files() { return _files; }
 		std::size_t           DefaultFile();  // MyOutfits.json, created in memory if missing
+		std::size_t           FileFor(std::string_view a_stem);  // created in memory if missing
+		static std::string    NewId();        // permanent set id, e.g. "iod-3fa29c1e"
+		static std::string    StemForPlugin(std::string_view a_plugin);  // "Cute Maid.esp" -> "Cute Maid"
 		bool                  Save(std::size_t a_file);
 
 	private:

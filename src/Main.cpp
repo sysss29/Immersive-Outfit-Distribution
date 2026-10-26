@@ -34,16 +34,17 @@ namespace
 		if (a_message->type == SKSE::MessagingInterface::kDataLoaded) {
 			IOD::Settings::Get().Load();
 			IOD::ResolveVendorFactions();
+			{
+				// First: gives every set a permanent id (written back to its file).
+				std::scoped_lock lock(IOD::Edit::Lock());
+				IOD::SetFiles::Get().Load();
+			}
 			IOD::Catalog::GetSingleton().Load();
 			IOD::Stocker::CheckTradeable();
 			IOD::Stocker::Install();
 			IOD::Shrines::GetSingleton()->Load();
 			IOD::Shrines::GetSingleton()->Install();
 			IOD::Shrines::StartWatching();
-			{
-				std::scoped_lock lock(IOD::Edit::Lock());
-				IOD::SetFiles::Get().Load();
-			}
 			IOD::UI::Register();
 		} else if (a_message->type == SKSE::MessagingInterface::kPostLoadGame ||
 				   a_message->type == SKSE::MessagingInterface::kNewGame) {
@@ -56,7 +57,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 {
 	SKSE::Init(a_skse);
 	InitLogging();
-	spdlog::info("Immersive Outfit Distribution 0.5.0 on Skyrim {}", REL::Module::get().version().string());
+	spdlog::info("Immersive Outfit Distribution 0.6.0 on Skyrim {}", REL::Module::get().version().string());
 
 	IOD::State::Register();
 	IOD::Papyrus::Install();

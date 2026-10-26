@@ -1,6 +1,5 @@
 {
   "_about": "Shrine registry and offerings of Immersive Outfit Distribution. Shipped with the mod (updates replace it). shrines: which shrine or statue records belong to which god (vanilla Skyrim.esm and Daedric Shrines - All in One). gods: the offering each god asks for a set of each rarity (a set can override it with its own 'offering'), and the line the god says when accepting. An item can list alternatives: any mix of them counts.",
-  "cooldownDays": 7,
   "statueReach": 700,
   "gods": {
     "Akatosh": {

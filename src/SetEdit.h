@@ -95,6 +95,13 @@ namespace IOD::Edit
 		std::vector<std::string> pieces;
 		std::array<bool, kAllSources.size()> sources{};
 		std::array<bool, kGods.size()> gods{};  // shrines that grant it
+		bool                     ownOffering{ false };  // false: the god's default for the rarity
+		struct OfferingLine
+		{
+			std::vector<std::string> refs;  // alternatives
+			int                      count{ 1 };
+		};
+		std::vector<OfferingLine> offering;
 		int                      rarity{ 0 };
 		bool                     hasPrice{ false };
 		int                      price{ 1000 };
@@ -140,6 +147,12 @@ namespace IOD::Edit
 	nlohmann::json DraftToJson(Draft& a_draft);
 	bool           SaveDraft(Draft& a_draft);  // writes the file and reloads the catalog in game
 	void           DeleteDraft(Draft& a_draft);
+	std::string    ModStemOf(const Draft& a_draft);          // file stem for the set's armour mod
+	bool           MoveDraftToFile(Draft& a_draft, std::size_t a_file);
+	std::size_t    SplitByMod();                             // moves every set to its mod's file; returns how many moved
+
+	// Items the shrine registry uses in offerings, for the offering editor: (label, refs).
+	std::vector<std::pair<std::string, std::vector<std::string>>> KnownOfferingItems();
 	void           ApplyChanges();
 
 	// All sets across files, in display order, as (file, index) pairs.

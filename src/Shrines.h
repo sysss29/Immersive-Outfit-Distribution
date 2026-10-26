@@ -25,8 +25,8 @@ namespace IOD
 		[[nodiscard]] const Offering& DefaultOffering(int a_god, Rarity a_rarity) const;
 		[[nodiscard]] const Offering& OfferingFor(const OutfitSet& a_set, int a_god) const;
 		[[nodiscard]] bool            HasShrine(int a_god) const;
-		[[nodiscard]] float           CooldownDaysLeft(int a_god) const;  // 0: ready
-		[[nodiscard]] float           CooldownDays() const { return _cooldownDays; }
+		void                          UpdateSnapshot();       // game thread
+		[[nodiscard]] std::vector<std::string> Snapshot() const;  // any thread: "God|status" lines
 
 		RE::BSEventNotifyControl ProcessEvent(const RE::TESActivateEvent* a_event, RE::BSTEventSource<RE::TESActivateEvent>*) override;
 		RE::BSEventNotifyControl ProcessEvent(RE::InputEvent* const* a_event, RE::BSTEventSource<RE::InputEvent*>*) override;
@@ -49,7 +49,8 @@ namespace IOD
 		std::array<God, 25>                      _gods{};
 		std::unordered_map<RE::FormID, int>      _byBase;   // shrine/statue base record -> god
 		std::unordered_set<RE::FormID>           _statues;  // bases that can't be activated
-		float                                    _cooldownDays{ 7.0f };
+		mutable std::mutex                       _snapshotLock;
+		std::vector<std::string>                 _snapshot;
 		float                                    _reach{ 700.0f };
 		std::chrono::steady_clock::time_point    _lastPress{};
 	};

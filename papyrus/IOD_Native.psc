@@ -30,9 +30,9 @@ String[] Function Choices(String asList) Global Native
 Function ReloadFiles() Global Native
 ; perks of the set's chosen skill tree, then "Other"
 String[] Function PerkChoices(Int aiSet) Global Native
+; every god, "[x] Mara" when the set is granted at Mara's shrine; SetInt "togglegod" toggles one
+String[] Function ShrineChoices(Int aiSet) Global Native
 
-; Shrines: current blessing ("none" or a god), one "God|status" line per god with sets, and a
-; testing helper. Set field "god": 0 none, 1.. god + 1, -1 several (edit in F1); text "offering".
+; Shrines: current blessing ("none" or a god) and one "God|status" line per god with sets. Set field "god": 0 none, 1.. god + 1, -1 several (edit in F1); text "offering".
 String Function Blessing() Global Native
 String[] Function ShrineLines() Global Native
-Function ClearCooldowns() Global Native

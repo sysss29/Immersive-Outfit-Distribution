@@ -8,6 +8,7 @@ namespace IOD
 	{
 		bool arrivalMessage{ true };       // "New arrivals at ..." when talking to a restocked vendor
 		bool guaranteeOnePerVendor{ false };  // testing aid: every vendor draws at least one set
+		bool balanceByMod{ true };            // each armour mod gets the same chance in the draw
 
 		static Settings& Get();
 		void             Load();

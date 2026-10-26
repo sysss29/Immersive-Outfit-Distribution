@@ -204,15 +204,16 @@ namespace IOD
 				spdlog::warn("{}: a set without a name was skipped", stem);
 				continue;
 			}
-			set.id = stem + "/" + set.name;
-			const auto context = set.id;
+			set.legacyId = stem + "/" + set.name;
+			set.id = entry.contains("id") && entry["id"].is_string() && !entry["id"].get<std::string>().empty() ? entry["id"].get<std::string>() : set.legacyId;
+			const auto context = set.legacyId;
 
 			if (!entry.value("enabled", true)) {
 				spdlog::info("{}: disabled", context);
 				continue;
 			}
 			if (Find(set.id)) {
-				spdlog::warn("{}: duplicate name, skipped", context);
+				spdlog::warn("{}: duplicate name or id (a copied file?), skipped", context);
 				continue;
 			}
 

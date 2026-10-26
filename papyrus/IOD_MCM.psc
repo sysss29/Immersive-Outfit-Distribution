@@ -39,13 +39,13 @@ Int oReqFaction = -1
 Int oReqGod = -1
 Int oReqPerk = -1
 Int oShrine = -1
-Int oClearCooldowns = -1
 Int oReqQuest = -1
 Int oReqRef = -1
 Int oReload = -1
 Int oRedraw = -1
 Int oArrival = -1
 Int oGuarantee = -1
+Int oBalance = -1
 
 Int Function GetVersion()
 	Return 2  ; 2: Shrines page
@@ -103,13 +103,13 @@ Function ClearIds()
 	oReqGod = -1
 	oReqPerk = -1
 	oShrine = -1
-	oClearCooldowns = -1
 	oReqQuest = -1
 	oReqRef = -1
 	oReload = -1
 	oRedraw = -1
 	oArrival = -1
 	oGuarantee = -1
+	oBalance = -1
 EndFunction
 
 Event OnPageReset(String asPage)
@@ -180,13 +180,8 @@ Function ShowEditor()
 		EndIf
 		i += 1
 	EndWhile
-	Int god = IOD_Native.GetInt(s, "god")
-	If god < 0
-		AddTextOption("Several shrines", "edit in F1", OPTION_FLAG_DISABLED)
-	Else
-		String[] shrines = ListOf("shrines")
-		oShrine = AddMenuOption("Shrine", shrines[god])
-	EndIf
+	AddHeaderOption("Granted at shrines")
+	oShrine = AddMenuOption("Shrines", IOD_Native.GetText(s, "shrines"))
 	AddHeaderOption("Pieces")
 	oPieces = AddTextOption("" + IOD_Native.GetInt(s, "pieces") + " pieces", "highlight to list")
 	AddTextOption("Add or remove pieces: F1", "", OPTION_FLAG_DISABLED)
@@ -309,6 +304,7 @@ Function ShowSettings()
 	SetCursorPosition(0)
 	AddHeaderOption("Vendors")
 	oArrival = AddToggleOption("New arrivals message", IOD_Native.GetSetting("arrival"))
+	oBalance = AddToggleOption("Balance the draw between mods", IOD_Native.GetSetting("balance"))
 	AddHeaderOption("Testing")
 	oGuarantee = AddToggleOption("A set at every vendor", IOD_Native.GetSetting("guarantee"))
 EndFunction
@@ -394,10 +390,6 @@ Event OnOptionSelect(Int aiOption)
 	ElseIf src >= 0
 		Report(IOD_Native.SetBool(selected, "src" + src, !IOD_Native.GetBool(selected, "src" + src)))
 		ForcePageReset()
-	ElseIf aiOption == oClearCooldowns
-		IOD_Native.ClearCooldowns()
-		ShowMessage("Every god accepts an offering again.", False)
-		ForcePageReset()
 	ElseIf aiOption == oRedraw
 		IOD_Native.Redraw()
 		ShowMessage("New stock has been drawn. Vendors show it the next time you talk to them.", False)
@@ -405,6 +397,9 @@ Event OnOptionSelect(Int aiOption)
 	ElseIf aiOption == oArrival
 		IOD_Native.SetSetting("arrival", !IOD_Native.GetSetting("arrival"))
 		SetToggleOptionValue(aiOption, IOD_Native.GetSetting("arrival"))
+	ElseIf aiOption == oBalance
+		IOD_Native.SetSetting("balance", !IOD_Native.GetSetting("balance"))
+		SetToggleOptionValue(aiOption, IOD_Native.GetSetting("balance"))
 	ElseIf aiOption == oGuarantee
 		IOD_Native.SetSetting("guarantee", !IOD_Native.GetSetting("guarantee"))
 		SetToggleOptionValue(aiOption, IOD_Native.GetSetting("guarantee"))
@@ -464,8 +459,8 @@ Event OnOptionMenuOpen(Int aiOption)
 		SetMenuDialogStartIndex(IOD_Native.GetInt(selected, "reqskill"))
 		SetMenuDialogDefaultIndex(0)
 	ElseIf aiOption == oShrine
-		SetMenuDialogOptions(ListOf("shrines"))
-		SetMenuDialogStartIndex(IOD_Native.GetInt(selected, "god"))
+		SetMenuDialogOptions(IOD_Native.ShrineChoices(selected))
+		SetMenuDialogStartIndex(0)
 		SetMenuDialogDefaultIndex(0)
 	ElseIf aiOption == oReqPerk
 		SetMenuDialogOptions(IOD_Native.PerkChoices(selected))
@@ -497,7 +492,7 @@ Event OnOptionMenuAccept(Int aiOption, Int aiIndex)
 	ElseIf aiOption == oReqSkill
 		Report(IOD_Native.SetInt(selected, "reqskill", aiIndex))
 	ElseIf aiOption == oShrine
-		Report(IOD_Native.SetInt(selected, "god", aiIndex))
+		Report(IOD_Native.SetInt(selected, "togglegod", aiIndex))
 	ElseIf aiOption == oReqPerk
 		Report(IOD_Native.SetInt(selected, "reqperk", aiIndex))
 	ElseIf aiOption == oReqGod
@@ -543,7 +538,7 @@ Event OnOptionHighlight(Int aiOption)
 	ElseIf aiOption == oShrine
 		String offering = IOD_Native.GetText(selected, "offering")
 		If offering == ""
-			SetInfoText("Daedra: offer the tribute at their statue. Divines: given freely at their shrine once the requirement (e.g. a quest) is met.")
+			SetInfoText("Pick a god to add or remove. Daedra: tribute at their statue. Divines: a gift at their shrine once the requirement (e.g. a quest) is met. Own offerings: F1.")
 		Else
 			SetInfoText(offering)
 		EndIf
@@ -559,6 +554,8 @@ Event OnOptionHighlight(Int aiOption)
 		SetInfoText("An editor ID (e.g. MQ202) or Plugin.esp|0xID.")
 	ElseIf aiOption == oRedraw
 		SetInfoText("Draws new stock for every vendor now, instead of waiting for the next 48 hours.")
+	ElseIf aiOption == oBalance
+		SetInfoText("Each armour mod gets the same chance at vendors, however many sets it has. Within a mod, rarity decides.")
 	ElseIf aiOption == oGuarantee
 		SetInfoText("For testing: every vendor gets at least one set each period.")
 	ElseIf aiOption == oArrival

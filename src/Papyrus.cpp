@@ -103,7 +103,7 @@ namespace IOD::Papyrus
 		{
 			const auto key = Lower(a_key.c_str());
 			auto&      s = Settings::Get();
-			return key == "arrival" ? s.arrivalMessage : key == "guarantee" ? s.guaranteeOnePerVendor : false;
+			return key == "arrival" ? s.arrivalMessage : key == "guarantee" ? s.guaranteeOnePerVendor : key == "balance" ? s.balanceByMod : false;
 		}
 
 		void SetSetting(Tag*, String a_key, bool a_value)
@@ -114,6 +114,8 @@ namespace IOD::Papyrus
 				s.arrivalMessage = a_value;
 			} else if (key == "guarantee") {
 				s.guaranteeOnePerVendor = a_value;
+			} else if (key == "balance") {
+				s.balanceByMod = a_value;
 			}
 			s.Save();
 		}
@@ -313,6 +315,10 @@ namespace IOD::Papyrus
 					d.reqPerk = 0;  // a different tree: start at its first perk
 				}
 				d.reqSkill = std::clamp(a_value, 0, static_cast<int>(kSkills.size()) - 1);
+			} else if (field == "togglegod") {  // ShrineChoices index: add or remove that god
+				if (a_value >= 0 && a_value < static_cast<int>(kGods.size())) {
+					d.gods[static_cast<std::size_t>(a_value)] = !d.gods[static_cast<std::size_t>(a_value)];
+				}
 			} else if (field == "god") {
 				d.gods = {};
 				if (a_value >= 1 && a_value <= static_cast<int>(kGods.size())) {
@@ -373,6 +379,15 @@ namespace IOD::Papyrus
 					text += fmt::format(" (+{} not loaded)", resolved.missing);
 				}
 				return Safe(text);
+			}
+			if (field == "shrines") {  // "Mara, Sanguine" or "none"
+				std::string text;
+				for (std::size_t g = 0; g < kGods.size(); ++g) {
+					if (d.gods[g]) {
+						text += (text.empty() ? "" : ", ") + std::string(kGods[g]);
+					}
+				}
+				return Safe(text.empty() ? "none" : text);
 			}
 			if (field == "offering") {  // what the set's (first) shrine asks
 				for (int g = 0; g < static_cast<int>(kGods.size()); ++g) {
@@ -474,34 +489,28 @@ namespace IOD::Papyrus
 		std::vector<String> ShrineLines(Tag*)
 		{
 			std::vector<String> out;
-			auto&               state = State::Get();
-			for (int g = 0; g < static_cast<int>(kGods.size()); ++g) {
-				int total = 0;
-				int left = 0;
-				for (const auto& set : Catalog::GetSingleton().Sets()) {
-					if (set.HasGod(g)) {
-						++total;
-						left += state.owned.contains(set.id) ? 0 : 1;
-					}
-				}
-				if (total == 0) {
-					continue;
-				}
-				std::string status = fmt::format("{} of {} set(s) left, {}", left, total, IsDivine(g) ? "gifts for deeds" : "for tribute");
-				if (!Shrines::GetSingleton()->HasShrine(g)) {
-					status += ", no shrine";
-				}
-				out.emplace_back(Safe(fmt::format("{}|{}", GodName(g), status)));
+			for (const auto& line : Shrines::GetSingleton()->Snapshot()) {
+				out.emplace_back(Safe(line));
 			}
 			return out;
 		}
 
-		void ClearCooldowns(Tag*)
+		// Every god, marked when the set is granted at their shrine; picking one toggles it.
+		std::vector<String> ShrineChoices(Tag*, std::int32_t a_index)
 		{
-			SKSE::GetTaskInterface()->AddTask([]() {
-				State::Get().lastOffering.clear();
-				spdlog::info("Shrine cooldowns cleared on request");
-			});
+			std::scoped_lock    lock(Lock());
+			std::vector<String> out;
+			Draft               d;
+			const bool          loaded = Load(d, a_index);
+			for (int g = 0; g < static_cast<int>(kGods.size()); ++g) {
+				const bool on = loaded && d.gods[static_cast<std::size_t>(g)];
+				auto       label = fmt::format("{}{}", on ? "[x] " : "[  ] ", kGods[static_cast<std::size_t>(g)]);
+				if (!Shrines::GetSingleton()->HasShrine(g)) {
+					label += " (no shrine)";
+				}
+				out.emplace_back(Safe(label));
+			}
+			return out;
 		}
 
 		void ReloadFiles(Tag*)
@@ -530,9 +539,9 @@ namespace IOD::Papyrus
 			a_vm->RegisterFunction("Choices", kScript, Choices);
 			a_vm->RegisterFunction("ReloadFiles", kScript, ReloadFiles);
 			a_vm->RegisterFunction("PerkChoices", kScript, PerkChoices);
+			a_vm->RegisterFunction("ShrineChoices", kScript, ShrineChoices);
 			a_vm->RegisterFunction("Blessing", kScript, Blessing);
 			a_vm->RegisterFunction("ShrineLines", kScript, ShrineLines);
-			a_vm->RegisterFunction("ClearCooldowns", kScript, ClearCooldowns);
 			spdlog::info("Papyrus functions registered for the MCM");
 			return true;
 		}

@@ -25,7 +25,8 @@ namespace IOD
 
 	struct OutfitSet
 	{
-		std::string                      id;    // "<file stem>/<name>", unique, used in the save
+		std::string                      id;        // permanent "id" from the file (survives renames), used in the save
+		std::string                      legacyId;  // "<file stem>/<name>": the id saves made before 0.6.0 use
 		std::string                      name;
 		std::vector<RE::TESObjectARMO*>  pieces;
 		std::vector<Source>              sources;

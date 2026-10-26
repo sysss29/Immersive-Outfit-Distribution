@@ -24,6 +24,7 @@ namespace IOD
 			const auto root = nlohmann::json::parse(in, nullptr, true, true);
 			arrivalMessage = root.value("arrivalMessage", arrivalMessage);
 			guaranteeOnePerVendor = root.value("guaranteeOnePerVendor", guaranteeOnePerVendor);
+			balanceByMod = root.value("balanceByMod", balanceByMod);
 			spdlog::info("Settings: arrival message {}, at least one set per vendor {}", arrivalMessage, guaranteeOnePerVendor);
 		} catch (const std::exception& e) {
 			spdlog::error("Settings file is not valid JSON ({}); using defaults", e.what());
@@ -35,6 +36,7 @@ namespace IOD
 		nlohmann::json root{
 			{ "arrivalMessage", arrivalMessage },
 			{ "guaranteeOnePerVendor", guaranteeOnePerVendor },
+			{ "balanceByMod", balanceByMod },
 		};
 		std::ofstream out{ std::filesystem::path{ kPath }, std::ios::trunc };
 		if (!out) {

@@ -2,6 +2,7 @@
 
 #include "Catalog.h"
 #include "Settings.h"
+#include "Shrines.h"
 #include "State.h"
 
 namespace IOD
@@ -258,6 +259,25 @@ namespace IOD
 
 	void Stocker::OnGameLoaded()
 	{
+		// Saves from before 0.6.0 name sets "<file>/<name>": switch them to the permanent ids.
+		{
+			auto& state = State::Get();
+			for (const auto& set : Catalog::GetSingleton().Sets()) {
+				if (set.id == set.legacyId) {
+					continue;
+				}
+				auto swap = [&](std::set<std::string>& a_ids) {
+					if (a_ids.erase(set.legacyId) > 0) {
+						a_ids.insert(set.id);
+					}
+				};
+				swap(state.owned);
+				swap(state.announced);
+				for (auto& [faction, ids] : state.allocation) {
+					std::ranges::replace(ids, set.legacyId, set.id);
+				}
+			}
+		}
 		// Redraw if the save's allocation puts a set where it can't be traded (e.g. a save from an
 		// older version, or a set file changed since).
 		auto& state = State::Get();
@@ -448,6 +468,20 @@ namespace IOD
 					if (pool.empty()) {
 						break;
 					}
+					// Balance: each armour mod gets the same share, however many sets it has.
+					if (Settings::Get().balanceByMod) {
+						auto modOf = [](const OutfitSet* a_set) -> std::string_view {
+							const auto* file = a_set->pieces.empty() ? nullptr : a_set->pieces.front()->GetFile(0);
+							return file ? file->GetFilename() : std::string_view{};
+						};
+						std::unordered_map<std::string_view, int> perMod;
+						for (const auto* set : pool) {
+							++perMod[modOf(set)];
+						}
+						for (std::size_t i = 0; i < pool.size(); ++i) {
+							weights[i] /= static_cast<double>(perMod[modOf(pool[i])]);
+						}
+					}
 					std::discrete_distribution<std::size_t> pick(weights.begin(), weights.end());
 					const auto*                             chosen = pool[pick(rng)];
 					used.insert(chosen->id);
@@ -487,6 +521,7 @@ namespace IOD
 				lines.push_back(std::move(line));
 			}
 		}
+		Shrines::GetSingleton()->UpdateSnapshot();
 		std::scoped_lock lock(g_snapshotLock);
 		g_snapshot = std::move(lines);
 		g_snapshotPeriod = State::Get().allocPeriod;

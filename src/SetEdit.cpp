@@ -82,13 +82,102 @@ namespace IOD::Edit
 
 	std::string OfferingText(const Draft& a_draft, int a_god)
 	{
-		if (a_draft.original.is_object() && a_draft.original.contains("offering")) {
-			if (const auto own = ParseOffering(a_draft.original["offering"], "editor")) {
+		if (a_draft.ownOffering && !a_draft.offering.empty()) {
+			auto lines = nlohmann::json::array();
+			for (const auto& line : a_draft.offering) {
+				lines.push_back({ { "item", line.refs }, { "count", line.count } });
+			}
+			if (const auto own = ParseOffering(lines, "editor")) {
 				return DescribeOffering(*own) + " (this set's own)";
 			}
+			return "this set's own offering has an item that isn't loaded";
 		}
 		const auto& offering = Shrines::GetSingleton()->DefaultOffering(a_god, static_cast<Rarity>(std::clamp(a_draft.rarity, 0, 2)));
 		return offering.empty() ? std::string("no offering defined") : DescribeOffering(offering);
+	}
+
+	std::string ModStemOf(const Draft& a_draft)
+	{
+		const auto resolved = Resolve(a_draft.outfit, a_draft.pieces);
+		const auto* file = resolved.pieces.empty() ? nullptr : resolved.pieces.front()->GetFile(0);
+		return file ? SetFiles::StemForPlugin(file->GetFilename()) : std::string("MyOutfits");
+	}
+
+	bool MoveDraftToFile(Draft& a_draft, std::size_t a_file)
+	{
+		auto& store = SetFiles::Get();
+		if (a_draft.index == SIZE_MAX || a_file == a_draft.file || a_file >= store.Files().size()) {
+			a_draft.file = a_file < store.Files().size() ? a_file : a_draft.file;
+			return true;
+		}
+		auto&      target = store.Files()[a_file].Sets();
+		const auto name = std::string(a_draft.name);
+		if (std::ranges::any_of(target, [&](const nlohmann::json& a_set) { return a_set.value("name", "") == name; })) {
+			a_draft.status = fmt::format("{}.json already has a set called \"{}\".", store.Files()[a_file].stem, name);
+			return false;
+		}
+		auto& source = store.Files()[a_draft.file].Sets();
+		target.push_back(DraftToJson(a_draft));
+		source.erase(source.begin() + static_cast<std::ptrdiff_t>(a_draft.index));
+		const auto from = a_draft.file;
+		store.Save(a_file);
+		store.Save(from);
+		a_draft.file = a_file;
+		a_draft.index = target.size() - 1;
+		a_draft.original = target.back();
+		a_draft.dirty = false;
+		a_draft.status = fmt::format("Moved to {}.json.", store.Files()[a_file].stem);
+		ApplyChanges();
+		return true;
+	}
+
+	std::size_t SplitByMod()
+	{
+		auto&       store = SetFiles::Get();
+		std::size_t moved = 0;
+		for (bool again = true; again;) {
+			again = false;
+			for (const auto& [f, i] : AllSets()) {
+				Draft d;
+				LoadDraft(d, f, i);
+				const auto stem = ModStemOf(d);
+				if (stem == store.Files()[f].stem || stem == "MyOutfits") {
+					continue;
+				}
+				if (MoveDraftToFile(d, store.FileFor(stem))) {
+					++moved;
+					again = true;  // indices changed: start over
+					break;
+				}
+			}
+		}
+		return moved;
+	}
+
+	std::vector<std::pair<std::string, std::vector<std::string>>> KnownOfferingItems()
+	{
+		std::vector<std::pair<std::string, std::vector<std::string>>> items;
+		std::set<std::string>                                         seen;
+		for (int god = 0; god < static_cast<int>(kGods.size()); ++god) {
+			for (const auto rarity : { Rarity::kCommon, Rarity::kRare, Rarity::kLegendary }) {
+				for (const auto& line : Shrines::GetSingleton()->DefaultOffering(god, rarity)) {
+					std::vector<std::string> refs;
+					for (auto* object : line.any) {
+						refs.push_back(FormString(object));
+					}
+					auto* first = line.any.front();
+					std::string label = first->GetFormID() == 0xF ? "Gold" : first->GetName();
+					if (line.any.size() > 1 && first->GetFormID() != 0xF) {
+						label += " (or similar)";
+					}
+					if (seen.insert(label).second) {
+						items.emplace_back(label, std::move(refs));
+					}
+				}
+			}
+		}
+		std::ranges::sort(items, {}, &std::pair<std::string, std::vector<std::string>>::first);
+		return items;
 	}
 
 	int MaxFactionRank(const Draft& a_draft)
@@ -276,6 +365,20 @@ namespace IOD::Edit
 				}
 			}
 		}
+		if (entry.contains("offering") && entry["offering"].is_array()) {
+			a_draft.ownOffering = true;
+			for (const auto& line : entry["offering"]) {
+				Draft::OfferingLine item;
+				item.count = std::max(1, line.value("count", 1));
+				const auto refs = line.contains("item") ? line["item"] : nlohmann::json{};
+				for (const auto& ref : refs.is_array() ? refs : nlohmann::json::array({ refs })) {
+					if (ref.is_string()) {
+						item.refs.push_back(ref.get<std::string>());
+					}
+				}
+				a_draft.offering.push_back(std::move(item));
+			}
+		}
 		const auto rarity = Normalise(entry.value("rarity", "common"));
 		a_draft.rarity = rarity == "rare" ? 1 : rarity == "legendary" ? 2 : 0;
 		if (entry.contains("price") && entry["price"].is_number_integer()) {
@@ -347,11 +450,13 @@ namespace IOD::Edit
 		auto& files = SetFiles::Get();
 		a_draft = Draft{};
 		a_draft.active = true;
-		a_draft.file = files.DefaultFile();
 		a_draft.index = SIZE_MAX;
+		a_draft.original = nlohmann::json{ { "id", SetFiles::NewId() } };
 		CopyTo(a_draft.name, a_name);
 		a_draft.outfit = std::move(a_outfit);
 		a_draft.pieces = std::move(a_pieces);
+		// One file per armour mod, so a mod's sets can be shared or reused as a preset.
+		a_draft.file = files.FileFor(ModStemOf(a_draft));
 		// Sold where it can be: clothing at Radiant Raiment, anything else at caravans and fences.
 		const auto resolved = Resolve(a_draft.outfit, a_draft.pieces).pieces;
 		if (TradeCount(resolved, Source::RadiantRaiment).first > 0) {
@@ -366,10 +471,26 @@ namespace IOD::Edit
 	nlohmann::json DraftToJson(Draft& a_draft)
 	{
 		nlohmann::json entry = a_draft.original.is_object() ? a_draft.original : nlohmann::json::object();
-		for (const auto* key : { "enabled", "outfit", "pieces", "sources", "rarity", "price", "requirement", "unique" }) {
+		for (const auto* key : { "enabled", "outfit", "pieces", "sources", "rarity", "price", "requirement", "unique", "offering" }) {
 			entry.erase(key);
 		}
 		entry["name"] = std::string(a_draft.name);
+		if (!entry.contains("id")) {
+			entry["id"] = SetFiles::NewId();
+		}
+		if (a_draft.ownOffering && !a_draft.offering.empty()) {
+			auto lines = nlohmann::json::array();
+			for (const auto& line : a_draft.offering) {
+				if (line.refs.empty()) {
+					continue;
+				}
+				nlohmann::json item = line.refs.size() == 1 ? nlohmann::json(line.refs.front()) : nlohmann::json(line.refs);
+				lines.push_back({ { "item", item }, { "count", std::max(1, line.count) } });
+			}
+			if (!lines.empty()) {
+				entry["offering"] = lines;
+			}
+		}
 		if (!a_draft.enabled) {
 			entry["enabled"] = false;
 		}
